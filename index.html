@@ -2710,7 +2710,6 @@ async function salvarTudoDrive() {
     var avatarDir = await getOrCreateFolder('Avatar', rootId);
     var sigDir    = await getOrCreateFolder('Assinatura de E-mail', rootId);
     var bvDir     = await getOrCreateFolder('Boas-Vindas', rootId);
-    var enxDir    = await getOrCreateFolder('Enxoval Completo', rootId);
     logDrive('Pastas OK ✓', 'ok');
 
     var uploads = [];
@@ -2788,8 +2787,6 @@ async function salvarTudoDrive() {
       if (!enxAssets || (!enxAssets.avatar && !enxAssets.sig && !enxAssets.bv)) {
         logDrive('Gere o enxoval completo antes de salvar.', 'err');
       } else {
-        var enxSubDir = await getOrCreateFolder(nomeEnx, enxDir);
-
         if (enxAssets.avatar) {
           logDrive('Salvando avatar...');
           try {
