@@ -1305,8 +1305,26 @@ async function analisarFotoIA(base64DataUrl) {
   badge.className   = 'av-nota nd';
   body.innerHTML    = '<div class="av-checker-loading">Analisando foto com IA...</div>';
 
-  var b64 = base64DataUrl.split(',')[1];
-  var mime = base64DataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+  // Redimensiona para no máximo 1024px e comprime antes de enviar à API
+  var resized = await new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var MAX = 1024;
+      var w = img.naturalWidth, h = img.naturalHeight;
+      if (w > MAX || h > MAX) {
+        var sc = Math.min(MAX/w, MAX/h);
+        w = Math.round(w*sc); h = Math.round(h*sc);
+      }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = base64DataUrl;
+  });
+
+  var b64 = resized.split(',')[1];
+  var mime = 'image/jpeg';
 
   var prompt = `Você é um verificador de boas práticas para fotos de colaboradores da empresa Sittax.
 Analise a imagem e responda SOMENTE em JSON válido, sem markdown, sem texto extra.
