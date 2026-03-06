@@ -1326,6 +1326,7 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
       headers: (function(){
         var h = {
           'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true'
         };
         try { var k = localStorage.getItem('anthropic_key'); if(k) h['x-api-key'] = k; } catch(e){}
