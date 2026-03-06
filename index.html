@@ -485,6 +485,21 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             <span id="key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">50 imagens/mês grátis</span>
           </div>
 
+          <!-- Anthropic API Key -->
+          <div class="field" style="margin-top:14px;">
+            <label>🤖 API Key — Anthropic (Verificador IA)</label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="inp-anthropic-key" type="password" placeholder="sk-ant-..."
+                style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
+                oninput="saveAnthropicKey(this.value)">
+              <a href="https://console.anthropic.com/settings/keys" target="_blank"
+                style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
+                Obter chave →
+              </a>
+            </div>
+            <span id="anthropic-key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">Necessária para o Verificador de Boas Práticas</span>
+          </div>
+
           <!-- Boas práticas -->
           <div class="boas-praticas">
             <div class="boas-praticas-title">Boas práticas para a foto</div>
@@ -1232,6 +1247,12 @@ function saveKey(v) {
   document.getElementById('key-status').style.color = v ? '#22c55e' : '#bbb';
 }
 
+function saveAnthropicKey(v) {
+  try { localStorage.setItem('anthropic_key', v); } catch(e) {}
+  var st = document.getElementById('anthropic-key-status');
+  if (st) { st.textContent = v ? '✓ Chave salva' : 'Necessária para o Verificador de Boas Práticas'; st.style.color = v ? '#22c55e' : '#bbb'; }
+}
+
 // Restore saved key — moved to DOMContentLoaded below
 
 function setAvHint(msg, color) {
@@ -1302,10 +1323,14 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
   try {
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: (function(){
+        var h = {
+          'Content-Type': 'application/json',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        };
+        try { var k = localStorage.getItem('anthropic_key'); if(k) h['x-api-key'] = k; } catch(e){}
+        return h;
+      })(),
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -1365,6 +1390,9 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
       : msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')
       ? 'Erro de rede — verifique se o site está hospedado (não funciona em arquivo local).'
       : 'Erro: ' + msg;
+    if (msg.includes('401') || !localStorage.getItem('anthropic_key')) {
+      hint = 'Adicione sua API key da Anthropic na aba Avatar para usar o verificador.';
+    }
     body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ ' + hint + '</p>'
       + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — você pode continuar normalmente.</p>';
   }
@@ -1491,6 +1519,17 @@ document.addEventListener('DOMContentLoaded', function() {
         el.value = saved;
         document.getElementById('key-status').textContent = '✓ Chave salva';
         document.getElementById('key-status').style.color = '#22c55e';
+      }
+    }
+  } catch(e) {}
+  try {
+    var savedAnth = localStorage.getItem('anthropic_key');
+    if (savedAnth) {
+      var elA = document.getElementById('inp-anthropic-key');
+      if (elA) {
+        elA.value = savedAnth;
+        document.getElementById('anthropic-key-status').textContent = '✓ Chave salva';
+        document.getElementById('anthropic-key-status').style.color = '#22c55e';
       }
     }
   } catch(e) {}
