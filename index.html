@@ -533,6 +533,17 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             </div>
           </div>
 
+          <div class="form-row" style="margin-bottom:16px;">
+            <div class="field">
+              <label>Nome completo</label>
+              <input id="av-nome" type="text" placeholder="Ex: João Silva" oninput="this.value=this.value.replace(/\b\w/g,c=>c.toUpperCase())">
+            </div>
+            <div class="field">
+              <label>Cargo</label>
+              <input id="av-cargo" type="text" placeholder="Ex: Analista Financeiro">
+            </div>
+          </div>
+
           <div class="field" style="margin-bottom:18px;">
             <label>1. Foto do colaborador</label>
             <label class="upload-label-btn" for="f-av" id="lbl-av" style="margin-bottom:0;">
@@ -896,7 +907,10 @@ var AV_BG = 'data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJT
 var SVG_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iQ2FtYWRhXzIiIGRhdGEtbmFtZT0iQ2FtYWRhIDIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUyNS4zNSA1MjUuMzUiPgogIDxkZWZzPgogICAgPHN0eWxlPgogICAgICAuY2xzLTEgewogICAgICAgIGZpbGw6ICNmMTY1MjQ7CiAgICAgICAgZmlsbC1ydWxlOiBldmVub2RkOwogICAgICB9CiAgICA8L3N0eWxlPgogIDwvZGVmcz4KICA8ZyBpZD0iQ2FtYWRhXzEtMiIgZGF0YS1uYW1lPSJDYW1hZGEgMSI+CiAgICA8Zz4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNNzcuODMsNDI1LjMxYzczLjAyLTk1LjgxLDczLjAxLTIyOS40NiwwLTMyNS4yN0wwLDE3Ny44NWMzMi4zLDUxLjc0LDMyLjI5LDExNy44OSwwLDE2OS42Mmw3Ny44Myw3Ny44M1oiLz4KICAgICAgPHBhdGggY2xhc3M9ImNscy0xIiBkPSJNMTAwLjA0LDc3LjgyYzk1LjgxLDczLjAyLDIyOS40Niw3My4wMiwzMjUuMjcsMEwzNDcuNDgsMGMtNTEuNzQsMzIuMy0xMTcuODksMzIuMy0xNjkuNjIsMGwtNzcuODIsNzcuODJaIi8+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMSIgZD0iTTQ0Ny41MiwxMDAuMDRjLTczLjAyLDk1LjgxLTczLjAyLDIyOS40NSwwLDMyNS4yN2w3Ny44Mi03Ny44MmMtMzIuMy01MS43NC0zMi4yOS0xMTcuODgsMC0xNjkuNjJsLTc3LjgzLTc3LjgzWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00MjUuMzEsNDQ3LjUzYy05NS44MS03My4wMi0yMjkuNDYtNzMuMDItMzI1LjI3LDBsNzcuODMsNzcuODNjNTEuNzQtMzIuMywxMTcuODgtMzIuMywxNjkuNjIsMGw3Ny44Mi03Ny44MloiLz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPg==';
 
 // ── Tabs ──
+var currentTab = 'assinatura'; // track active tab
+
 function switchTab(id, btn) {
+  currentTab = id;
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
   document.getElementById('tab-'+id).classList.add('active');
@@ -2660,94 +2674,144 @@ async function appendToSheet(sheetId, values) {
   await driveRequest('POST', url, { values: [values] });
 }
 
-// ── Main save function ──
+// ── Main save function (tab-aware) ──
 async function salvarTudoDrive() {
   if (!gAccessToken) { driveLogin(); return; }
 
-  var nome    = (document.getElementById('inp-name') && document.getElementById('inp-name').value.trim())
-              || (document.getElementById('bv-name') && document.getElementById('bv-name').value.trim())
-              || 'Colaborador';
-  var cargo   = (document.getElementById('inp-role') && document.getElementById('inp-role').value.trim())
-              || (document.getElementById('bv-role') && document.getElementById('bv-role').value.trim())
-              || '';
-  var unidade = document.getElementById('bv-unit') ? document.getElementById('bv-unit').value.trim() : '';
-  var data    = new Date().toLocaleDateString('pt-BR');
-  var nomeArq = nome.replace(/\s+/g,'_');
+  // Use global currentTab
+  var activeTab = 'tab-' + currentTab;
 
   var btn = document.getElementById('btn-save-all');
   btn.disabled = true; btn.textContent = '⏳ Salvando...';
   openDriveProgress();
 
   try {
-    // ── Estrutura de pastas ──
-    // Sittax Identidade Visual/
-    //   ├── Avatar/
-    //   ├── Assinatura de E-mail/
-    //   └── Boas-Vindas/
-
-    logDrive('Criando estrutura de pastas...');
-    var rootId     = await getOrCreateFolder('Sittax Identidade Visual');
-    var avatarDir  = await getOrCreateFolder('Avatar', rootId);
-    var sigDir     = await getOrCreateFolder('Assinatura de E-mail', rootId);
-    var bvDir      = await getOrCreateFolder('Boas-Vindas', rootId);
+    // Garante estrutura de pastas
+    logDrive('Preparando pastas no Drive...');
+    var rootId    = await getOrCreateFolder('Sittax Identidade Visual');
+    var avatarDir = await getOrCreateFolder('Avatar', rootId);
+    var sigDir    = await getOrCreateFolder('Assinatura de E-mail', rootId);
+    var bvDir     = await getOrCreateFolder('Boas-Vindas', rootId);
+    var enxDir    = await getOrCreateFolder('Enxoval Completo', rootId);
     logDrive('Pastas OK ✓', 'ok');
 
     var uploads = [];
+    var data = new Date().toLocaleDateString('pt-BR');
 
-    // ── Avatar PNG → pasta Avatar ──
-    var avCvs = document.getElementById('av-canvas');
-    if (avCvs && avImg) {
-      logDrive('Enviando Avatar...');
-      try {
-        var avUrl = avCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive(nome + ' Avatar.png', avUrl, avatarDir);
-        logDrive(nome + ' Avatar.png ✓', 'ok');
-        uploads.push('Avatar');
-      } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
+    // ══════════════════════════════════════════
+    // ABA AVATAR
+    // ══════════════════════════════════════════
+    if (activeTab === 'tab-avatar' || activeTab === '') {
+      var nomeAv = (document.getElementById('av-nome') && document.getElementById('av-nome').value.trim()) || 'Colaborador';
+      var avCvs = document.getElementById('av-canvas');
+      if (avCvs && avImg) {
+        logDrive('Salvando avatar de ' + nomeAv + '...');
+        try {
+          var avUrl = avCvs.toDataURL('image/png', 1.0);
+          await uploadFileToDrive(nomeAv + ' Avatar.png', avUrl, avatarDir);
+          logDrive(nomeAv + ' Avatar.png ✓', 'ok');
+          uploads.push('Avatar');
+        } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
+      } else {
+        logDrive('Nenhum avatar gerado para salvar.', 'err');
+      }
     }
 
-    // ── Assinatura PNG → pasta Assinatura de E-mail ──
-    if (photoB64) {
-      logDrive('Gerando Assinatura...');
-      try {
-        var sigCvs = document.createElement('canvas');
-        var n2 = document.getElementById('inp-name') ? document.getElementById('inp-name').value.trim() : nome;
-        var r2 = document.getElementById('inp-role') ? document.getElementById('inp-role').value.trim() : cargo;
-        await desenhar(n2, r2, sigCvs);
-        var sigUrl = sigCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive(nome + ' Assinatura de E-mail.png', sigUrl, sigDir);
-        logDrive(nome + ' Assinatura de E-mail.png ✓', 'ok');
-        uploads.push('Assinatura');
-      } catch(e) { logDrive('Erro Assinatura: ' + e.message, 'err'); }
+    // ══════════════════════════════════════════
+    // ABA ASSINATURA
+    // ══════════════════════════════════════════
+    else if (activeTab === 'tab-assinatura') {
+      var nomeSig = (document.getElementById('inp-name') && document.getElementById('inp-name').value.trim()) || 'Colaborador';
+      if (photoB64) {
+        logDrive('Gerando assinatura de ' + nomeSig + '...');
+        try {
+          var sigCvs = document.createElement('canvas');
+          var n2 = document.getElementById('inp-name').value.trim();
+          var r2 = document.getElementById('inp-role').value.trim();
+          await desenhar(n2, r2, sigCvs);
+          var sigUrl = sigCvs.toDataURL('image/png', 1.0);
+          await uploadFileToDrive(nomeSig + ' Assinatura de E-mail.png', sigUrl, sigDir);
+          logDrive(nomeSig + ' Assinatura de E-mail.png ✓', 'ok');
+          uploads.push('Assinatura');
+        } catch(e) { logDrive('Erro Assinatura: ' + e.message, 'err'); }
+      } else {
+        logDrive('Nenhuma assinatura gerada. Adicione uma foto primeiro.', 'err');
+      }
     }
 
-    // ── Boas-Vindas PNG → pasta Boas-Vindas ──
-    if (bvPhotoB64) {
-      logDrive('Gerando Boas-Vindas...');
-      try {
-        var bvCvs = document.createElement('canvas');
-        await bvDraw(bvCvs, 1080);
-        var bvUrl = bvCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive(nome + ' Boas-Vindas.png', bvUrl, bvDir);
-        logDrive(nome + ' Boas-Vindas.png ✓', 'ok');
-        uploads.push('Boas-Vindas');
-      } catch(e) { logDrive('Erro Boas-Vindas: ' + e.message, 'err'); }
+    // ══════════════════════════════════════════
+    // ABA BOAS-VINDAS
+    // ══════════════════════════════════════════
+    else if (activeTab === 'tab-boasvindas') {
+      var nomeBv = (document.getElementById('bv-name') && document.getElementById('bv-name').value.trim()) || 'Colaborador';
+      if (bvPhotoB64) {
+        logDrive('Gerando arte de boas-vindas de ' + nomeBv + '...');
+        try {
+          var bvCvs = document.createElement('canvas');
+          await bvDraw(bvCvs, 1080);
+          var bvUrl = bvCvs.toDataURL('image/png', 1.0);
+          await uploadFileToDrive(nomeBv + ' Boas-Vindas.png', bvUrl, bvDir);
+          logDrive(nomeBv + ' Boas-Vindas.png ✓', 'ok');
+          uploads.push('Boas-Vindas');
+        } catch(e) { logDrive('Erro Boas-Vindas: ' + e.message, 'err'); }
+      } else {
+        logDrive('Nenhuma arte gerada. Preencha os dados e adicione uma foto primeiro.', 'err');
+      }
     }
 
-    // ── Registro na planilha ──
-    if (DRIVE_CONFIG.sheetId) {
-      logDrive('Registrando na planilha...');
-      try {
-        await appendToSheet(DRIVE_CONFIG.sheetId, [nome, cargo, unidade, data, uploads.join(', ')]);
-        logDrive('Planilha atualizada ✓', 'ok');
-      } catch(e) { logDrive('Erro planilha: ' + e.message, 'err'); }
+    // ══════════════════════════════════════════
+    // ABA ENXOVAL
+    // ══════════════════════════════════════════
+    else if (activeTab === 'tab-enxoval') {
+      var nomeEnx = (document.getElementById('enx-nome') && document.getElementById('enx-nome').value.trim()) || 'Colaborador';
+      var cargoEnx = (document.getElementById('enx-cargo') && document.getElementById('enx-cargo').value.trim()) || '';
+      var unidadeEnx = (document.getElementById('enx-unit') && document.getElementById('enx-unit').value.trim()) || '';
+
+      if (!enxAssets || (!enxAssets.avatar && !enxAssets.sig && !enxAssets.bv)) {
+        logDrive('Gere o enxoval completo antes de salvar.', 'err');
+      } else {
+        var enxSubDir = await getOrCreateFolder(nomeEnx, enxDir);
+
+        if (enxAssets.avatar) {
+          logDrive('Salvando avatar...');
+          try {
+            await uploadFileToDrive(nomeEnx + ' Avatar.png', enxAssets.avatar, avatarDir);
+            logDrive(nomeEnx + ' Avatar.png ✓', 'ok');
+            uploads.push('Avatar');
+          } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
+        }
+        if (enxAssets.sig) {
+          logDrive('Salvando assinatura...');
+          try {
+            await uploadFileToDrive(nomeEnx + ' Assinatura de E-mail.png', enxAssets.sig, sigDir);
+            logDrive(nomeEnx + ' Assinatura de E-mail.png ✓', 'ok');
+            uploads.push('Assinatura');
+          } catch(e) { logDrive('Erro Assinatura: ' + e.message, 'err'); }
+        }
+        if (enxAssets.bv) {
+          logDrive('Salvando boas-vindas...');
+          try {
+            await uploadFileToDrive(nomeEnx + ' Boas-Vindas.png', enxAssets.bv, bvDir);
+            logDrive(nomeEnx + ' Boas-Vindas.png ✓', 'ok');
+            uploads.push('Boas-Vindas');
+          } catch(e) { logDrive('Erro Boas-Vindas: ' + e.message, 'err'); }
+        }
+
+        // Registro planilha
+        if (DRIVE_CONFIG.sheetId && uploads.length) {
+          try {
+            await appendToSheet(DRIVE_CONFIG.sheetId, [nomeEnx, cargoEnx, unidadeEnx, data, uploads.join(', ')]);
+            logDrive('Planilha atualizada ✓', 'ok');
+          } catch(e) { logDrive('Erro planilha: ' + e.message, 'err'); }
+        }
+      }
     }
 
     var total = uploads.length;
-    document.getElementById('dp-title').textContent = total ? '✅ ' + total + ' arquivo(s) salvo(s)!' : '⚠️ Nenhum arquivo gerado';
+    document.getElementById('dp-title').textContent = total ? '✅ ' + total + ' arquivo(s) salvo(s)!' : '⚠️ Nada foi salvo';
     document.getElementById('dp-desc').textContent  = total
-      ? 'Salvos em Sittax Identidade Visual → ' + uploads.join(', ')
-      : 'Gere ao menos um asset antes de salvar no Drive.';
+      ? 'Arquivos enviados para a pasta correta no Drive ✓'
+      : 'Verifique se os dados e a foto foram preenchidos.';
 
   } catch(e) {
     logDrive('Erro geral: ' + e.message, 'err');
@@ -2755,7 +2819,7 @@ async function salvarTudoDrive() {
     document.getElementById('dp-desc').textContent  = e.message;
   }
 
-  btn.disabled = false; btn.textContent = '☁ Salvar tudo no Drive';
+  btn.disabled = false; btn.textContent = '☁ Salvar no Drive';
   document.getElementById('dp-close-btn').style.display = 'inline-block';
 }
 
