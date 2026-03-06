@@ -1345,19 +1345,26 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
     });
 
     var data = await response.json();
+    console.log('Anthropic response status:', response.status);
+    console.log('Anthropic response data:', JSON.stringify(data).slice(0, 500));
+
+    // Se a API retornou erro (ex: 401, 400), mostra mensagem útil
+    if (data.error) throw new Error(data.error.type + ': ' + data.error.message);
 
     // Coleta todo o texto da resposta
     var raw = '';
     if (data.content && Array.isArray(data.content)) {
       raw = data.content.map(function(b){ return b.text || ''; }).join('');
     }
+    console.log('Raw AI text:', raw.slice(0, 300));
+
     // Remove markdown fences e espaços
     raw = raw.replace(/```json|```/g, '').trim();
 
     // Extrai apenas o bloco JSON (entre { e último })
     var jsonStart = raw.indexOf('{');
     var jsonEnd   = raw.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Resposta inválida da IA');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Resposta inválida da IA — veja o console para detalhes');
     raw = raw.slice(jsonStart, jsonEnd + 1);
 
     var result = JSON.parse(raw);
@@ -1390,11 +1397,15 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
       : msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')
       ? 'Erro de rede — verifique se o site está hospedado (não funciona em arquivo local).'
       : 'Erro: ' + msg;
-    if (msg.includes('401') || !localStorage.getItem('anthropic_key')) {
-      hint = 'Adicione sua API key da Anthropic na aba Avatar para usar o verificador.';
+    if (!localStorage.getItem('anthropic_key')) {
+      hint = 'Adicione sua API key da Anthropic na aba Avatar para ativar o verificador.';
+    } else if (msg.includes('401') || msg.includes('authentication')) {
+      hint = 'API key inválida — verifique a chave em console.anthropic.com';
+    } else if (msg.includes('400') || msg.includes('invalid')) {
+      hint = 'Erro na requisição: ' + msg;
     }
     body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ ' + hint + '</p>'
-      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — você pode continuar normalmente.</p>';
+      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — abra o Console do browser (F12) para mais detalhes.</p>';
   }
 }
 
