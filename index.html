@@ -1320,9 +1320,21 @@ Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da f
     });
 
     var data = await response.json();
-    var raw  = data.content && data.content[0] ? data.content[0].text : '';
-    // Strip possible markdown fences
+
+    // Coleta todo o texto da resposta
+    var raw = '';
+    if (data.content && Array.isArray(data.content)) {
+      raw = data.content.map(function(b){ return b.text || ''; }).join('');
+    }
+    // Remove markdown fences e espaços
     raw = raw.replace(/```json|```/g, '').trim();
+
+    // Extrai apenas o bloco JSON (entre { e último })
+    var jsonStart = raw.indexOf('{');
+    var jsonEnd   = raw.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Resposta inválida da IA');
+    raw = raw.slice(jsonStart, jsonEnd + 1);
+
     var result = JSON.parse(raw);
 
     // Render nota badge
