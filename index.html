@@ -2664,85 +2664,95 @@ async function appendToSheet(sheetId, values) {
 async function salvarTudoDrive() {
   if (!gAccessToken) { driveLogin(); return; }
 
-  var nome  = document.getElementById('inp-name').value.trim()  || document.getElementById('bv-name').value.trim() || 'Colaborador';
-  var cargo = document.getElementById('inp-role').value.trim()  || document.getElementById('bv-role').value.trim() || '';
+  var nome    = (document.getElementById('inp-name') && document.getElementById('inp-name').value.trim())
+              || (document.getElementById('bv-name') && document.getElementById('bv-name').value.trim())
+              || 'Colaborador';
+  var cargo   = (document.getElementById('inp-role') && document.getElementById('inp-role').value.trim())
+              || (document.getElementById('bv-role') && document.getElementById('bv-role').value.trim())
+              || '';
   var unidade = document.getElementById('bv-unit') ? document.getElementById('bv-unit').value.trim() : '';
-  var data  = new Date().toLocaleDateString('pt-BR');
+  var data    = new Date().toLocaleDateString('pt-BR');
+  var nomeArq = nome.replace(/\s+/g,'_');
 
   var btn = document.getElementById('btn-save-all');
   btn.disabled = true; btn.textContent = '⏳ Salvando...';
   openDriveProgress();
 
   try {
-    // 1. Get/create root folder
-    logDrive('Procurando pasta "' + DRIVE_CONFIG.folderName + '"...');
-    var rootId = await getOrCreateFolder(DRIVE_CONFIG.folderName);
-    logDrive('Pasta raiz OK', 'ok');
+    // ── Estrutura de pastas ──
+    // Sittax Identidade Visual/
+    //   ├── Avatar/
+    //   ├── Assinatura de E-mail/
+    //   └── Boas-Vindas/
 
-    // 2. Create subfolder for this collaborator
-    var subName = nome + (cargo ? ' — ' + cargo : '');
-    logDrive('Criando subpasta para ' + nome + '...');
-    var subId = await getOrCreateFolder(subName, rootId);
-    logDrive('Subpasta criada', 'ok');
+    logDrive('Criando estrutura de pastas...');
+    var rootId     = await getOrCreateFolder('Sittax Identidade Visual');
+    var avatarDir  = await getOrCreateFolder('Avatar', rootId);
+    var sigDir     = await getOrCreateFolder('Assinatura de E-mail', rootId);
+    var bvDir      = await getOrCreateFolder('Boas-Vindas', rootId);
+    logDrive('Pastas OK ✓', 'ok');
 
     var uploads = [];
 
-    // 3. Avatar PNG
+    // ── Avatar PNG → pasta Avatar ──
     var avCvs = document.getElementById('av-canvas');
     if (avCvs && avImg) {
       logDrive('Enviando Avatar...');
       try {
         var avUrl = avCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive('avatar_' + nome.replace(/\s+/g,'_') + '.png', avUrl, subId);
-        logDrive('Avatar salvo ✓', 'ok');
+        await uploadFileToDrive(nome + ' Avatar.png', avUrl, avatarDir);
+        logDrive(nome + ' Avatar.png ✓', 'ok');
         uploads.push('Avatar');
-      } catch(e) { logDrive('Erro no Avatar: '+e.message, 'err'); }
+      } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
     }
 
-    // 4. Assinatura PNG
+    // ── Assinatura PNG → pasta Assinatura de E-mail ──
     if (photoB64) {
-      logDrive('Gerando e enviando Assinatura...');
+      logDrive('Gerando Assinatura...');
       try {
         var sigCvs = document.createElement('canvas');
-        var n2 = document.getElementById('inp-name').value.trim();
-        var r2 = document.getElementById('inp-role').value.trim();
+        var n2 = document.getElementById('inp-name') ? document.getElementById('inp-name').value.trim() : nome;
+        var r2 = document.getElementById('inp-role') ? document.getElementById('inp-role').value.trim() : cargo;
         await desenhar(n2, r2, sigCvs);
         var sigUrl = sigCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive('assinatura_' + nome.replace(/\s+/g,'_') + '.png', sigUrl, subId);
-        logDrive('Assinatura salva ✓', 'ok');
+        await uploadFileToDrive(nome + ' Assinatura de E-mail.png', sigUrl, sigDir);
+        logDrive(nome + ' Assinatura de E-mail.png ✓', 'ok');
         uploads.push('Assinatura');
-      } catch(e) { logDrive('Erro na Assinatura: '+e.message, 'err'); }
+      } catch(e) { logDrive('Erro Assinatura: ' + e.message, 'err'); }
     }
 
-    // 5. Boas-vindas PNG
+    // ── Boas-Vindas PNG → pasta Boas-Vindas ──
     if (bvPhotoB64) {
-      logDrive('Gerando e enviando arte de Boas-vindas...');
+      logDrive('Gerando Boas-Vindas...');
       try {
         var bvCvs = document.createElement('canvas');
         await bvDraw(bvCvs, 1080);
         var bvUrl = bvCvs.toDataURL('image/png', 1.0);
-        await uploadFileToDrive('boasvindas_' + nome.replace(/\s+/g,'_') + '.png', bvUrl, subId);
-        logDrive('Boas-vindas salvo ✓', 'ok');
-        uploads.push('Boas-vindas');
-      } catch(e) { logDrive('Erro no Boas-vindas: '+e.message, 'err'); }
+        await uploadFileToDrive(nome + ' Boas-Vindas.png', bvUrl, bvDir);
+        logDrive(nome + ' Boas-Vindas.png ✓', 'ok');
+        uploads.push('Boas-Vindas');
+      } catch(e) { logDrive('Erro Boas-Vindas: ' + e.message, 'err'); }
     }
 
-    // 6. Registro na planilha
+    // ── Registro na planilha ──
     if (DRIVE_CONFIG.sheetId) {
       logDrive('Registrando na planilha...');
       try {
         await appendToSheet(DRIVE_CONFIG.sheetId, [nome, cargo, unidade, data, uploads.join(', ')]);
         logDrive('Planilha atualizada ✓', 'ok');
-      } catch(e) { logDrive('Erro na planilha: '+e.message, 'err'); }
+      } catch(e) { logDrive('Erro planilha: ' + e.message, 'err'); }
     }
 
-    document.getElementById('dp-title').textContent = '✅ Tudo salvo!';
-    document.getElementById('dp-desc').textContent =
-      uploads.length + ' arquivo(s) enviados para "' + DRIVE_CONFIG.folderName + '/' + subName + '"';
+    var total = uploads.length;
+    document.getElementById('dp-title').textContent = total ? '✅ ' + total + ' arquivo(s) salvo(s)!' : '⚠️ Nenhum arquivo gerado';
+    document.getElementById('dp-desc').textContent  = total
+      ? 'Salvos em Sittax Identidade Visual → ' + uploads.join(', ')
+      : 'Gere ao menos um asset antes de salvar no Drive.';
 
   } catch(e) {
     logDrive('Erro geral: ' + e.message, 'err');
     document.getElementById('dp-title').textContent = '⚠️ Erro ao salvar';
+    document.getElementById('dp-desc').textContent  = e.message;
   }
 
   btn.disabled = false; btn.textContent = '☁ Salvar tudo no Drive';
