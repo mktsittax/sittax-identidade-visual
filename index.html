@@ -487,17 +487,17 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
 
           <!-- Anthropic API Key -->
           <div class="field" style="margin-top:14px;">
-            <label>🤖 API Key — Anthropic (Verificador IA)</label>
+            <label>🤖 API Key — Google Gemini (Verificador IA)</label>
             <div style="display:flex;gap:8px;align-items:center;">
-              <input id="inp-anthropic-key" type="password" placeholder="sk-ant-..."
+              <input id="inp-anthropic-key" type="password" placeholder="AIza..."
                 style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
                 oninput="saveAnthropicKey(this.value)">
-              <a href="https://console.anthropic.com/settings/keys" target="_blank"
+              <a href="https://aistudio.google.com/apikey" target="_blank"
                 style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
                 Obter chave →
               </a>
             </div>
-            <span id="anthropic-key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">Necessária para o Verificador de Boas Práticas</span>
+            <span id="anthropic-key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">Gratuita — 1.500 análises/dia</span>
           </div>
 
           <!-- Boas práticas -->
@@ -1034,7 +1034,28 @@ function loadPhoto(input) {
   r.readAsDataURL(input.files[0]);
 }
 
+
+// ── Redimensiona foto para max 2000px antes de qualquer processamento ──
+async function resizeFotoParaUpload(b64, maxPx) {
+  maxPx = maxPx || 2000;
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      if (w <= maxPx && h <= maxPx) { resolve(b64); return; }
+      var sc = Math.min(maxPx/w, maxPx/h);
+      var c = document.createElement('canvas');
+      c.width = Math.round(w*sc); c.height = Math.round(h*sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = function() { resolve(b64); };
+    img.src = b64;
+  });
+}
 async function sigProcessarFoto(originalB64) {
+  // Redimensiona para max 2000px antes de processar
+  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
   var fotoFinal = originalB64;
   var hint = document.getElementById('sig-hint');
@@ -1296,449 +1317,115 @@ function applyImgToAvatar(imgSrc) {
 
 // ── Verificador de Boas Práticas com IA ──
 async function analisarFotoIA(base64DataUrl) {
-  var checker  = document.getElementById('av-checker');
-  var body     = document.getElementById('av-checker-body');
-  var badge    = document.getElementById('av-nota-badge');
+  var checker = document.getElementById('av-checker');
+  var body    = document.getElementById('av-checker-body');
+  var badge   = document.getElementById('av-nota-badge');
 
   checker.style.display = 'block';
   badge.textContent = '—';
   badge.className   = 'av-nota nd';
   body.innerHTML    = '<div class="av-checker-loading">Analisando foto com IA...</div>';
 
-  // Redimensiona para no máximo 1024px e comprime antes de enviar à API
+  // Redimensiona para max 1024px antes de enviar
   var resized = await new Promise(function(resolve) {
     var img = new Image();
     img.onload = function() {
-      var MAX = 1024;
-      var w = img.naturalWidth, h = img.naturalHeight;
-      if (w > MAX || h > MAX) {
-        var sc = Math.min(MAX/w, MAX/h);
-        w = Math.round(w*sc); h = Math.round(h*sc);
-      }
-      var c = document.createElement('canvas');
-      c.width = w; c.height = h;
+      var MAX = 1024, w = img.naturalWidth, h = img.naturalHeight;
+      if (w > MAX || h > MAX) { var sc = Math.min(MAX/w, MAX/h); w = Math.round(w*sc); h = Math.round(h*sc); }
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0, w, h);
       resolve(c.toDataURL('image/jpeg', 0.85));
     };
     img.src = base64DataUrl;
   });
 
-  var b64 = resized.split(',')[1];
+  var b64  = resized.split(',')[1];
   var mime = 'image/jpeg';
+
+  var geminiKey = '';
+  try { geminiKey = localStorage.getItem('anthropic_key') || ''; } catch(e) {}
+
+  if (!geminiKey) {
+    body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ Adicione sua API key do Google Gemini para usar o verificador.</p>'
+      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — você pode continuar normalmente.</p>';
+    return;
+  }
 
   var prompt = `Você é um verificador de boas práticas para fotos de colaboradores da empresa Sittax.
 Analise a imagem e responda SOMENTE em JSON válido, sem markdown, sem texto extra.
 
-Critérios a avaliar:
+Critérios:
 1. roupa_preta: a pessoa está com roupa preta ou muito escura?
-2. rosto_visivel: o rosto está completamente visível, sem cortes na cabeça ou laterais?
-3. ombros_visiveis: os ombros aparecem sem cortes?
-4. iluminacao: a iluminação é adequada (nem muito escura, nem estourada)?
-5. sem_filtros: a foto parece natural, sem filtros ou distorções visíveis?
+2. rosto_visivel: rosto completamente visível, sem cortes?
+3. ombros_visiveis: ombros aparecem sem cortes?
+4. iluminacao: iluminação adequada (nem escura nem estourada)?
+5. sem_filtros: foto natural, sem filtros ou distorções?
 
-Responda exatamente neste formato:
-{
-  "nota": "A" | "B" | "C" | "D",
-  "resumo": "frase curta de até 12 palavras",
-  "itens": [
-    {"criterio": "roupa_preta", "ok": true|false, "label": "Roupa preta", "obs": "observação curta"},
-    {"criterio": "rosto_visivel", "ok": true|false, "label": "Rosto visível", "obs": "observação curta"},
-    {"criterio": "ombros_visiveis", "ok": true|false, "label": "Ombros visíveis", "obs": "observação curta"},
-    {"criterio": "iluminacao", "ok": true|false, "label": "Boa iluminação", "obs": "observação curta"},
-    {"criterio": "sem_filtros", "ok": true|false, "label": "Sem filtros", "obs": "observação curta"}
-  ]
-}
+Responda exatamente neste formato JSON:
+{"nota":"A","resumo":"frase curta de até 12 palavras","itens":[{"criterio":"roupa_preta","ok":true,"label":"Roupa preta","obs":"obs curta"},{"criterio":"rosto_visivel","ok":true,"label":"Rosto visível","obs":"obs curta"},{"criterio":"ombros_visiveis","ok":true,"label":"Ombros visíveis","obs":"obs curta"},{"criterio":"iluminacao","ok":true,"label":"Boa iluminação","obs":"obs curta"},{"criterio":"sem_filtros","ok":true,"label":"Sem filtros","obs":"obs curta"}]}
 
-Nota: A = tudo ok, B = 1 problema leve, C = 2 problemas, D = 3+ problemas graves.
-Seja direto e construtivo. Lembre: isso é ORIENTATIVO, não bloqueia o uso da foto.`;
+Nota: A=tudo ok, B=1 problema leve, C=2 problemas, D=3+ problemas. Seja direto e construtivo.`;
 
   try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: (function(){
-        var h = {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        };
-        try { var k = localStorage.getItem('anthropic_key'); if(k) h['x-api-key'] = k; } catch(e){}
-        return h;
-      })(),
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mime, data: b64 } },
-            { type: 'text',  text: prompt }
-          ]
-        }]
-      })
-    });
+    var response = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: mime, data: b64 } },
+              { text: prompt }
+            ]
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 600 }
+        })
+      }
+    );
 
     var data = await response.json();
-    console.log('Anthropic response status:', response.status);
-    console.log('Anthropic response data:', JSON.stringify(data).slice(0, 500));
+    console.log('Gemini status:', response.status);
+    console.log('Gemini response:', JSON.stringify(data).slice(0, 500));
 
-    // Se a API retornou erro (ex: 401, 400), mostra mensagem útil
-    if (data.error) throw new Error(data.error.type + ': ' + data.error.message);
+    if (data.error) throw new Error(data.error.message || 'Erro na API Gemini');
 
-    // Coleta todo o texto da resposta
     var raw = '';
-    if (data.content && Array.isArray(data.content)) {
-      raw = data.content.map(function(b){ return b.text || ''; }).join('');
+    if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+      raw = data.candidates[0].content.parts.map(function(p){ return p.text||''; }).join('');
     }
-    console.log('Raw AI text:', raw.slice(0, 300));
-
-    // Remove markdown fences e espaços
     raw = raw.replace(/```json|```/g, '').trim();
+    var jsonStart = raw.indexOf('{'), jsonEnd = raw.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Resposta inválida da IA');
+    var result = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
 
-    // Extrai apenas o bloco JSON (entre { e último })
-    var jsonStart = raw.indexOf('{');
-    var jsonEnd   = raw.lastIndexOf('}');
-    if (jsonStart === -1 || jsonEnd === -1) throw new Error('Resposta inválida da IA — veja o console para detalhes');
-    raw = raw.slice(jsonStart, jsonEnd + 1);
-
-    var result = JSON.parse(raw);
-
-    // Render nota badge
-    var notaClass = {'A':'a','B':'b','C':'c','D':'d'}[result.nota] || 'nd';
+    // Render result
+    var notaClass = { A:'ok', B:'ok', C:'warn', D:'err' }[result.nota] || 'nd';
     badge.textContent = result.nota || '—';
     badge.className   = 'av-nota ' + notaClass;
 
-    // Render items
-    var html2 = '<p style="font-size:12px;color:var(--gray);margin-bottom:12px;font-style:italic;">"' + (result.resumo||'') + '"</p>';
-    (result.itens || []).forEach(function(item) {
-      var icon = item.ok ? '✅' : '⚠️';
-      html2 += '<div class="av-check-item">'
-             + '<span class="av-check-icon">' + icon + '</span>'
-             + '<div class="av-check-text">'
-             + '<strong>' + item.label + '</strong>'
-             + (item.obs ? ' <span class="obs">— ' + item.obs + '</span>' : '')
-             + '</div></div>';
+    var html2 = '<p style="font-size:12px;color:#555;margin-bottom:10px;">' + (result.resumo||'') + '</p>';
+    (result.itens||[]).forEach(function(it) {
+      var icon = it.ok ? '✅' : '⚠️';
+      html2 += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">'
+        + '<span style="font-size:14px;line-height:1.4;">' + icon + '</span>'
+        + '<div><span style="font-size:12px;font-weight:700;color:#333;">' + it.label + '</span>'
+        + '<span style="font-size:11px;color:#777;margin-left:6px;">' + (it.obs||'') + '</span></div></div>';
     });
-    html2 += '<p style="font-size:10px;color:#bbb;margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">⚙ Análise orientativa — a foto pode ser usada independentemente da nota.</p>';
+    html2 += '<p style="font-size:10px;color:#bbb;margin-top:10px;">Este verificador é orientativo — não impede o uso da foto.</p>';
     body.innerHTML = html2;
 
-  } catch(e) {
-    console.error('Checker error:', e);
-    // Tenta mostrar mensagem útil
-    var msg = e && e.message ? e.message : String(e);
-    var hint = msg.includes('401') || msg.includes('403')
-      ? 'Verifique se a API key do Claude está configurada no servidor.'
-      : msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')
-      ? 'Erro de rede — verifique se o site está hospedado (não funciona em arquivo local).'
-      : 'Erro: ' + msg;
-    if (!localStorage.getItem('anthropic_key')) {
-      hint = 'Adicione sua API key da Anthropic na aba Avatar para ativar o verificador.';
-    } else if (msg.includes('401') || msg.includes('authentication')) {
-      hint = 'API key inválida — verifique a chave em console.anthropic.com';
-    } else if (msg.includes('400') || msg.includes('invalid')) {
-      hint = 'Erro na requisição: ' + msg;
-    }
+  } catch(err) {
+    var msg = err.message || '';
+    var hint = 'Erro: ' + msg;
+    if (msg.includes('API_KEY_INVALID') || msg.includes('400')) hint = 'API key inválida — verifique em aistudio.google.com';
+    if (msg.includes('429')) hint = 'Limite de requisições atingido — tente novamente em instantes';
     body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ ' + hint + '</p>'
-      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — abra o Console do browser (F12) para mais detalhes.</p>';
+      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — abra o Console (F12) para mais detalhes.</p>';
   }
 }
 
-function loadAv(input) {
-  if (!input.files || !input.files[0]) return;
-  var file = input.files[0];
-  var apiKey = document.getElementById('inp-apikey').value.trim();
 
-  // Update thumb immediately
-  var thumbReader = new FileReader();
-  thumbReader.onload = function(e) {
-    document.getElementById('lbl-av').innerHTML =
-      '<img src="'+e.target.result+'" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Foto carregada</span>';
-    // Aciona verificador IA em paralelo
-    analisarFotoIA(e.target.result);
-  };
-  thumbReader.readAsDataURL(file);
-
-  if (!apiKey) {
-    // No API key — load original without bg removal
-    var r = new FileReader();
-    r.onload = function(e) { applyImgToAvatar(e.target.result); };
-    r.readAsDataURL(file);
-    setAvHint('⚠ Sem API key — fundo não removido', '#e07000');
-    return;
-  }
-
-  // Call remove.bg API
-  setAvHint('⏳ Removendo fundo...', 'var(--orange)');
-  document.getElementById('av-infobox').innerHTML =
-    '⏳ <strong>Processando...</strong> Aguarde enquanto o fundo é removido.';
-
-  // Converte arquivo para base64 e envia como JSON (compatível com todos os ambientes)
-  var b64reader = new FileReader();
-  b64reader.onload = function(ev) {
-    var b64 = ev.target.result.split(',')[1];
-    var ext = file.type === 'image/png' ? 'png' : 'jpg';
-
-    fetch('https://api.remove.bg/v1.0/removebg', {
-      method: 'POST',
-      headers: {
-        'X-Api-Key': apiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        image_file_b64: b64,
-        size: 'auto',
-        format: 'png'
-      })
-    })
-    .then(function(res) {
-      if (!res.ok) {
-        return res.json().then(function(err) {
-          throw new Error(err.errors ? err.errors[0].title : 'Erro ' + res.status);
-        });
-      }
-      return res.blob();
-    })
-    .then(function(blob) {
-      var reader2 = new FileReader();
-      reader2.onload = function(e2) {
-        applyImgToAvatar(e2.target.result);
-        setAvHint('✓ Fundo removido — arraste para ajustar', '#22c55e');
-        document.getElementById('av-infobox').innerHTML =
-          '✅ <strong>Fundo removido!</strong> Arraste a foto no círculo e ajuste o zoom.';
-      };
-      reader2.readAsDataURL(blob);
-    })
-    .catch(function(e) {
-      var r = new FileReader();
-      r.onload = function(ev2) { applyImgToAvatar(ev2.target.result); };
-      r.readAsDataURL(file);
-      setAvHint('⚠ Erro: ' + e.message, '#e03000');
-      document.getElementById('av-infobox').innerHTML =
-        '⚠️ <strong>Erro ao remover fundo:</strong> ' + e.message + '. Verifique sua API key.';
-    });
-  };
-  b64reader.readAsDataURL(file);
-}
-
-function drawAv() {
-  var cvs = document.getElementById('av-canvas');
-  var ctx = cvs.getContext('2d');
-  cvs.width = AV; cvs.height = AV;
-
-  // Clip tudo ao círculo — elimina bordas pretas do PNG de fundo
-  ctx.save();
-  ctx.beginPath(); ctx.arc(AV/2, AV/2, AV/2, 0, Math.PI*2); ctx.clip();
-
-  // Fundo ligeiramente maior para cobrir qualquer borda
-  var pad = 8;
-  if (_avBgLoaded.complete) {
-    ctx.drawImage(_avBgLoaded, -pad, -pad, AV+pad*2, AV+pad*2);
-  } else {
-    var grad = ctx.createRadialGradient(AV/2, AV*0.38, 0, AV/2, AV/2, AV/2);
-    grad.addColorStop(0,'#F05A1A'); grad.addColorStop(0.55,'#F05A1A'); grad.addColorStop(1,'rgba(240,90,26,0)');
-    ctx.beginPath(); ctx.arc(AV/2,AV/2,AV/2,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
-  }
-
-  if (avImg) {
-    var z = parseFloat(document.getElementById('sl-zoom').value);
-    var bright = parseFloat(document.getElementById('sl-bright').value);
-    ctx.filter = 'brightness('+bright+')';
-    ctx.drawImage(avImg, avX, avY, avImg.naturalWidth*z, avImg.naturalHeight*z);
-    ctx.filter = 'none';
-  }
-
-  ctx.restore();
-}
-
-// Drag events
-var wrap = null;
-document.addEventListener('DOMContentLoaded', function() {
-  wrap = document.getElementById('av-wrap');
-
-  // Restore API key
-  try {
-    var saved = localStorage.getItem('rbg_key');
-    if (saved) {
-      var el = document.getElementById('inp-apikey');
-      if (el) {
-        el.value = saved;
-        document.getElementById('key-status').textContent = '✓ Chave salva';
-        document.getElementById('key-status').style.color = '#22c55e';
-      }
-    }
-  } catch(e) {}
-  try {
-    var savedAnth = localStorage.getItem('anthropic_key');
-    if (savedAnth) {
-      var elA = document.getElementById('inp-anthropic-key');
-      if (elA) {
-        elA.value = savedAnth;
-        document.getElementById('anthropic-key-status').textContent = '✓ Chave salva';
-        document.getElementById('anthropic-key-status').style.color = '#22c55e';
-      }
-    }
-  } catch(e) {}
-
-  // Draw initial empty avatar
-  var cvs0 = document.getElementById('av-canvas');
-  if (cvs0) {
-    var ctx0 = cvs0.getContext('2d');
-    ctx0.fillStyle = '#e0ddd8';
-    ctx0.beginPath(); ctx0.arc(AV/2,AV/2,AV/2,0,Math.PI*2); ctx0.fill();
-    ctx0.font=(AV*0.3)+'px serif'; ctx0.fillStyle='#bbb';
-    ctx0.textAlign='center'; ctx0.textBaseline='middle';
-    ctx0.fillText('👤',AV/2,AV/2+4);
-    ctx0.strokeStyle='rgba(200,197,192,0.95)'; ctx0.lineWidth=10;
-    ctx0.beginPath(); ctx0.arc(AV/2,AV/2,AV/2-5,0,Math.PI*2); ctx0.stroke();
-  }
-
-  wrap.addEventListener('mousedown', function(e) {
-    if (!avImg) return;
-    avDragging = true;
-    avDragSX = e.clientX; avDragSY = e.clientY;
-    avStartX = avX; avStartY = avY;
-    e.preventDefault();
-  });
-  document.addEventListener('mousemove', function(e) {
-    if (!avDragging) return;
-    avX = avStartX + (e.clientX - avDragSX);
-    avY = avStartY + (e.clientY - avDragSY);
-    drawAv();
-  });
-  document.addEventListener('mouseup', function() { avDragging = false; });
-
-  // Touch support
-  wrap.addEventListener('touchstart', function(e) {
-    if (!avImg) return;
-    var t = e.touches[0];
-    avDragging = true;
-    avDragSX = t.clientX; avDragSY = t.clientY;
-    avStartX = avX; avStartY = avY;
-    e.preventDefault();
-  }, {passive:false});
-  document.addEventListener('touchmove', function(e) {
-    if (!avDragging) return;
-    var t = e.touches[0];
-    avX = avStartX + (t.clientX - avDragSX);
-    avY = avStartY + (t.clientY - avDragSY);
-    drawAv();
-  });
-  document.addEventListener('touchend', function() { avDragging = false; });
-
-  // Zoom slider live update
-  document.getElementById('sl-zoom').addEventListener('input', function() {
-    var newZ = parseFloat(this.value);
-    // Zoom from center
-    var oldW = avImg ? avImg.naturalWidth  * avZoom : 0;
-    var oldH = avImg ? avImg.naturalHeight * avZoom : 0;
-    var newW = avImg ? avImg.naturalWidth  * newZ   : 0;
-    var newH = avImg ? avImg.naturalHeight * newZ   : 0;
-    avX += (oldW - newW) / 2;
-    avY += (oldH - newH) / 2;
-    avZoom = newZ;
-    document.getElementById('vz').textContent = newZ.toFixed(2);
-    drawAv();
-  });
-});
-
-function baixarAv() {
-  // Render final at 2x resolution
-  var cvs2 = document.createElement('canvas');
-  cvs2.width = AV*2; cvs2.height = AV*2;
-  var ctx2 = cvs2.getContext('2d');
-  ctx2.scale(2,2);
-
-  var z = parseFloat(document.getElementById('sl-zoom').value);
-  var bright = parseFloat(document.getElementById('sl-bright').value);
-
-  // Clip to circle
-  // Fundo: imagem de background
-  var bgImg2 = new Image();
-  bgImg2.src = AV_BG;
-  // Clip e fundo sem bordas pretas
-  ctx2.save();
-  ctx2.beginPath(); ctx2.arc(AV/2,AV/2,AV/2,0,Math.PI*2); ctx2.clip();
-  ctx2.drawImage(_avBgLoaded, -8, -8, AV+16, AV+16);
-
-  // Clip para círculo antes de desenhar foto
-  ctx2.save();
-  ctx2.beginPath(); ctx2.arc(AV/2,AV/2,AV/2,0,Math.PI*2); ctx2.clip();
-
-  if (avImg) {
-    ctx2.filter = 'brightness('+bright+')';
-    ctx2.drawImage(avImg, avX, avY, avImg.naturalWidth*z, avImg.naturalHeight*z);
-    ctx2.filter = 'none';
-  }
-  ctx2.restore();
-
-  // aro já incluso na imagem de fundo
-
-
-  var url = cvs2.toDataURL('image/png',1.0);
-  var a = document.createElement('a'); a.href=url; a.download='avatar_sittax.png';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-function usarNaSig() {
-  var cvs = document.getElementById('av-canvas');
-  photoB64 = cvs.toDataURL('image/png', 1.0);
-  document.getElementById('lbl-photo').innerHTML =
-    '<img src="'+photoB64+'" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Avatar importado</span>';
-  switchTab('assinatura', document.querySelectorAll('.tab-btn')[0]);
-  liveUpdate();
-}
-
-function usarNoBV() {
-  var cvs = document.getElementById('av-canvas');
-  bvPhotoB64 = cvs.toDataURL('image/png', 1.0);
-  document.getElementById('lbl-bv').innerHTML =
-    '<img src="'+bvPhotoB64+'" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Avatar importado</span>';
-  switchTab('boasvindas', document.querySelectorAll('.tab-btn')[2]);
-  bvUpdate();
-}
-
-// Draw initial empty avatar
-// Pré-carrega imagem de fundo do avatar
-var _avBgLoaded = new Image();
-_avBgLoaded.src = AV_BG;
-
-// avatar init — moved to DOMContentLoaded below
-
-
-// ══════════════════════════════════════
-// ABA 3 — BOAS-VINDAS
-// ══════════════════════════════════════
-var bvPhotoB64 = null;
-
-// Nomes femininos comuns em PT-BR para detecção automática
-var NOMES_FEM = ['ana','maria','julia','juliana','fernanda','patricia','sandra','claudia','lucia',
-  'marcia','adriana','simone','monica','rosana','vanessa','daniela','camila','beatriz','leticia',
-  'larissa','bruna','carolina','amanda','priscila','natalia','renata','cristina','eliane','fatima',
-  'aparecida','jose','josefa','joseane','viviane','tatiane','deborah','debora','bianca','isabela',
-  'isabel','rafaela','gabriela','elisa','alice','sofia','valentina','laura','mariana','aline',
-  'cintia','luciana','silvana','solange','regiane','rejane','rosangela','rosilene','edna','vera',
-  'sueli','tereza','terezinha','irene','conceicao','benedita','noemia','gloria','elza','nilza',
-  'mirian','miriam','lilian','liliane','elaine','alessandra','andrea','angela','fabiana','janaina',
-  'jaqueline','kelly','lais','livia','lorena','maira','maiara','nayara','pamela','sabrina','talita',
-  'tania','thamires','thais','vivian','wanessa','yasmin','elvira'];
-
-function bvDetectGender(name) {
-  var sel = document.getElementById('bv-gender').value;
-  if (sel === 'm') return 'm';
-  if (sel === 'f') return 'f';
-  // auto: pega primeiro nome, normaliza e compara
-  var first = name.trim().split(' ')[0].toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if (NOMES_FEM.indexOf(first) >= 0) return 'f';
-  // terminação em 'a' geralmente feminino
-  if (first.endsWith('a') && !['joshua','luca','nikita','danila'].includes(first)) return 'f';
-  return 'm';
-}
-
-function bvTitleCase(el) {
-  var pos = el.selectionStart;
-  var v = el.value.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); });
-  if (el.value !== v) { el.value = v; el.setSelectionRange(pos, pos); }
-}
 
 // ── BV EDITOR STATE ──
 var bvEditorImg = null;
@@ -1855,6 +1542,8 @@ function loadBvPhoto(input) {
 }
 
 async function bvProcessarFoto(originalB64) {
+  // Redimensiona para max 2000px antes de processar
+  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
   var fotoFinal = originalB64;
   var hint = document.getElementById('bv-editor-hint');
@@ -2315,6 +2004,8 @@ function loadEnxFoto(input) {
 }
 
 async function enxProcessarFoto(originalB64) {
+  // Redimensiona para max 2000px antes de processar
+  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
   var fotoFinal = originalB64;
   var hint = document.getElementById('enx-hint');
@@ -2673,7 +2364,7 @@ async function uploadFileToDrive(filename, dataUrl, folderId) {
   combined.set(u8, head.length);
   combined.set(tail, head.length + u8.length);
 
-  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + gAccessToken,
@@ -2682,7 +2373,16 @@ async function uploadFileToDrive(filename, dataUrl, folderId) {
     body: combined
   });
   if (!r.ok) throw new Error('Upload HTTP ' + r.status);
-  return r.json();
+  var fileData = await r.json();
+  // Torna o arquivo acessível a qualquer pessoa com o link
+  try {
+    await fetch('https://www.googleapis.com/drive/v3/files/' + fileData.id + '/permissions', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + gAccessToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } catch(e) {}
+  return fileData;
 }
 
 // ── Cria/encontra a planilha de registros dentro de uma pasta ──
@@ -2725,68 +2425,65 @@ async function findRowByName(sheetId, nomeCompleto) {
 async function upsertRegistro(sheetId, nome, sobrenome, cargo, unidade, assets, links) {
   var nomeCompleto = (nome + ' ' + sobrenome).trim();
   var data = new Date().toLocaleDateString('pt-BR');
-  var foto = assets.includes('Foto') ? '✓' : '—';
-  var avatar = assets.includes('Avatar') ? '✓' : '—';
-  var sig = assets.includes('Assinatura') ? '✓' : '—';
-  var bv = assets.includes('Boas-Vindas') ? '✓' : '—';
 
-  var rowData = [nome, sobrenome, cargo, unidade, data, foto, avatar, sig, bv,
-    '=COUNTIF(F{R}:I{R},"✓")/4', // % completo — placeholder substituído abaixo
-    '=IF(J{R}=1,"Completo",IF(J{R}=0,"Pendente","Em andamento"))',
-    links.avatar || '—', links.sig || '—', links.bv || '—'
-  ];
-
-  var existingRow = await findRowByName(sheetId, nomeCompleto);
-
-  if (existingRow > 1) {
-    // Atualiza linha existente — preserva checks já marcados
-    var existing = await driveRequest('GET',
-      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + existingRow + ':N' + existingRow);
-    var cur = (existing.values && existing.values[0]) || [];
-    // Mantém ✓ já existentes
-    if (cur[5] === '✓') rowData[5] = '✓'; // foto
-    if (cur[6] === '✓') rowData[6] = '✓'; // avatar
-    if (cur[7] === '✓') rowData[7] = '✓'; // assinatura
-    if (cur[8] === '✓') rowData[8] = '✓'; // boas-vindas
-    // Mantém links existentes se novo for vazio
-    if (cur[11] && cur[11] !== '—' && rowData[11] === '—') rowData[11] = cur[11];
-    if (cur[12] && cur[12] !== '—' && rowData[12] === '—') rowData[12] = cur[12];
-    if (cur[13] && cur[13] !== '—' && rowData[13] === '—') rowData[13] = cur[13];
-
-    rowData[9]  = '=COUNTIF(F' + existingRow + ':I' + existingRow + ',"✓")/4';
-    rowData[10] = '=IF(J' + existingRow + '=1,"Completo",IF(J' + existingRow + '=0,"Pendente","Em andamento"))';
-
-    await driveRequest('PUT',
-      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + existingRow + ':N' + existingRow + '?valueInputOption=USER_ENTERED',
-      { values: [rowData] }
-    );
-    return existingRow;
-  } else {
-    // Adiciona nova linha e descobre qual linha foi inserida
-    var appendRes = await driveRequest('POST',
-      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A1:append?valueInputOption=USER_ENTERED&includeValuesInResponse=false&insertDataOption=INSERT_ROWS',
-      { values: [rowData] }
-    );
-    // Corrige fórmulas com o número de linha correto
-    var updatedRange = appendRes.updates && appendRes.updates.updatedRange;
-    if (updatedRange) {
-      var match = updatedRange.match(/[A-Z]+(\d+)$/);
-      if (match) {
-        var newRow = parseInt(match[1]);
-        var fix = [rowData[0],rowData[1],rowData[2],rowData[3],rowData[4],rowData[5],rowData[6],rowData[7],rowData[8],
-          '=COUNTIF(F' + newRow + ':I' + newRow + ',"✓")/4',
-          '=IF(J' + newRow + '=1,"Completo",IF(J' + newRow + '=0,"Pendente","Em andamento"))',
-          rowData[11], rowData[12], rowData[13]
-        ];
-        await driveRequest('PUT',
-          'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + newRow + ':N' + newRow + '?valueInputOption=USER_ENTERED',
-          { values: [fix] }
-        );
+  // Busca linha existente pelo nome completo (col A = nome, col B = sobrenome)
+  var existingRow = -1;
+  try {
+    var readA = await driveRequest('GET',
+      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A:B');
+    if (readA.values) {
+      for (var i = 1; i < readA.values.length; i++) {
+        var rowName = ((readA.values[i][0]||'') + ' ' + (readA.values[i][1]||'')).trim().toLowerCase();
+        if (rowName === nomeCompleto.toLowerCase()) { existingRow = i + 1; break; }
       }
     }
-    return -1;
+  } catch(e) {}
+
+  // Lê valores atuais se linha existe
+  var cur = [];
+  if (existingRow > 1) {
+    try {
+      var exRead = await driveRequest('GET',
+        'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + existingRow + ':N' + existingRow);
+      cur = (exRead.values && exRead.values[0]) || [];
+    } catch(e) {}
   }
+
+  // Monta checks — preserva ✓ existentes
+  var foto     = (cur[5]==='✓' || assets.includes('Foto'))         ? '✓' : '—';
+  var avatar   = (cur[6]==='✓' || assets.includes('Avatar'))       ? '✓' : '—';
+  var sig      = (cur[7]==='✓' || assets.includes('Assinatura'))   ? '✓' : '—';
+  var bv       = (cur[8]==='✓' || assets.includes('Boas-Vindas')) ? '✓' : '—';
+
+  // Conta checks para % e status (sem fórmula — evita erro de referência)
+  var checkCount = [foto,avatar,sig,bv].filter(function(v){return v==='✓';}).length;
+  var pct = Math.round(checkCount / 4 * 100) + '%';
+  var status = checkCount === 4 ? 'Completo' : checkCount === 0 ? 'Pendente' : 'Em andamento';
+
+  // Links — preserva existentes, adiciona novos
+  var linkAv  = links.avatar || (cur[11] && cur[11] !== '—' ? cur[11] : '—');
+  var linkSig = links.sig    || (cur[12] && cur[12] !== '—' ? cur[12] : '—');
+  var linkBv  = links.bv     || (cur[13] && cur[13] !== '—' ? cur[13] : '—');
+
+  var rowData = [nome, sobrenome, cargo || (cur[2]||''), unidade || (cur[3]||''),
+    data, foto, avatar, sig, bv, pct, status, linkAv, linkSig, linkBv];
+
+  if (existingRow > 1) {
+    await driveRequest('PUT',
+      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
+      '/values/A' + existingRow + ':N' + existingRow + '?valueInputOption=USER_ENTERED',
+      { values: [rowData] }
+    );
+  } else {
+    await driveRequest('POST',
+      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
+      '/values/A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
+      { values: [rowData] }
+    );
+  }
+  return existingRow;
 }
+
 
 async function appendToSheet(sheetId, values) {
   if (!sheetId) return;
@@ -2830,9 +2527,17 @@ async function salvarTudoDrive() {
         logDrive('Salvando avatar de ' + nomeAv + '...');
         try {
           var avUrl = avCvs.toDataURL('image/png', 1.0);
-          await uploadFileToDrive(nomeAv + ' Avatar.png', avUrl, avatarDir);
+          var avFile = await uploadFileToDrive(nomeAv + ' Avatar.png', avUrl, avatarDir);
           logDrive(nomeAv + ' Avatar.png ✓', 'ok');
           uploads.push('Avatar');
+          if (registroSheetId) {
+            try {
+              var pav = nomeAv.trim().split(' ');
+              var cargoAv = (document.getElementById('av-cargo') && document.getElementById('av-cargo').value.trim()) || '';
+              await upsertRegistro(registroSheetId, pav[0]||nomeAv, pav.slice(1).join(' ')||'', cargoAv, '', ['Avatar'], { avatar: (avFile&&avFile.webViewLink)||'—' });
+              logDrive('Planilha atualizada ✓', 'ok');
+            } catch(e) {}
+          }
         } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
       } else {
         logDrive('Nenhum avatar gerado para salvar.', 'err');
@@ -2852,14 +2557,14 @@ async function salvarTudoDrive() {
           var r2 = document.getElementById('inp-role').value.trim();
           await desenhar(n2, r2, sigCvs);
           var sigUrl = sigCvs.toDataURL('image/png', 1.0);
-          await uploadFileToDrive(nomeSig + ' Assinatura de E-mail.png', sigUrl, sigDir);
+          var sigFile = await uploadFileToDrive(nomeSig + ' Assinatura de E-mail.png', sigUrl, sigDir);
           logDrive(nomeSig + ' Assinatura de E-mail.png ✓', 'ok');
           uploads.push('Assinatura');
           if (registroSheetId) {
             try {
               var psig = nomeSig.trim().split(' ');
               var cargoSig = (document.getElementById('inp-role') && document.getElementById('inp-role').value.trim()) || '';
-              await upsertRegistro(registroSheetId, psig[0]||nomeSig, psig.slice(1).join(' ')||'', cargoSig, '', ['Assinatura'], {});
+              await upsertRegistro(registroSheetId, psig[0]||nomeSig, psig.slice(1).join(' ')||'', cargoSig, '', ['Assinatura'], { sig: (typeof sigFile!=='undefined'&&sigFile.webViewLink)||'—' });
               logDrive('Planilha atualizada ✓', 'ok');
             } catch(e) {}
           }
@@ -2880,7 +2585,7 @@ async function salvarTudoDrive() {
           var bvCvs = document.createElement('canvas');
           await bvDraw(bvCvs, 1080);
           var bvUrl = bvCvs.toDataURL('image/png', 1.0);
-          await uploadFileToDrive(nomeBv + ' Boas-Vindas.png', bvUrl, bvDir);
+          var bvFile = await uploadFileToDrive(nomeBv + ' Boas-Vindas.png', bvUrl, bvDir);
           logDrive(nomeBv + ' Boas-Vindas.png ✓', 'ok');
           uploads.push('Boas-Vindas');
           if (registroSheetId) {
@@ -2888,7 +2593,7 @@ async function salvarTudoDrive() {
               var pbv = nomeBv.trim().split(' ');
               var cargoBv = (document.getElementById('bv-role') && document.getElementById('bv-role').value.trim()) || '';
               var unidadeBv = (document.getElementById('bv-unit') && document.getElementById('bv-unit').value) || '';
-              await upsertRegistro(registroSheetId, pbv[0]||nomeBv, pbv.slice(1).join(' ')||'', cargoBv, unidadeBv, ['Boas-Vindas'], {});
+              await upsertRegistro(registroSheetId, pbv[0]||nomeBv, pbv.slice(1).join(' ')||'', cargoBv, unidadeBv, ['Boas-Vindas'], { bv: bvFile.webViewLink||'—' });
               logDrive('Planilha atualizada ✓', 'ok');
             } catch(e) {}
           }
@@ -2909,10 +2614,12 @@ async function salvarTudoDrive() {
       if (!enxAssets || (!enxAssets.avatar && !enxAssets.sig && !enxAssets.bv)) {
         logDrive('Gere o enxoval completo antes de salvar.', 'err');
       } else {
+        var enxLinks = {};
         if (enxAssets.avatar) {
           logDrive('Salvando avatar...');
           try {
-            await uploadFileToDrive(nomeEnx + ' Avatar.png', enxAssets.avatar, avatarDir);
+            var enxAvFile = await uploadFileToDrive(nomeEnx + ' Avatar.png', enxAssets.avatar, avatarDir);
+            enxLinks.avatar = enxAvFile.webViewLink || '—';
             logDrive(nomeEnx + ' Avatar.png ✓', 'ok');
             uploads.push('Avatar');
           } catch(e) { logDrive('Erro Avatar: ' + e.message, 'err'); }
@@ -2920,7 +2627,8 @@ async function salvarTudoDrive() {
         if (enxAssets.sig) {
           logDrive('Salvando assinatura...');
           try {
-            await uploadFileToDrive(nomeEnx + ' Assinatura de E-mail.png', enxAssets.sig, sigDir);
+            var enxSigFile = await uploadFileToDrive(nomeEnx + ' Assinatura de E-mail.png', enxAssets.sig, sigDir);
+            enxLinks.sig = enxSigFile.webViewLink || '—';
             logDrive(nomeEnx + ' Assinatura de E-mail.png ✓', 'ok');
             uploads.push('Assinatura');
           } catch(e) { logDrive('Erro Assinatura: ' + e.message, 'err'); }
@@ -2928,7 +2636,8 @@ async function salvarTudoDrive() {
         if (enxAssets.bv) {
           logDrive('Salvando boas-vindas...');
           try {
-            await uploadFileToDrive(nomeEnx + ' Boas-Vindas.png', enxAssets.bv, bvDir);
+            var enxBvFile = await uploadFileToDrive(nomeEnx + ' Boas-Vindas.png', enxAssets.bv, bvDir);
+            enxLinks.bv = enxBvFile.webViewLink || '—';
             logDrive(nomeEnx + ' Boas-Vindas.png ✓', 'ok');
             uploads.push('Boas-Vindas');
           } catch(e) { logDrive('Erro Boas-Vindas: ' + e.message, 'err'); }
@@ -2941,7 +2650,7 @@ async function salvarTudoDrive() {
             var partes = nomeEnx.trim().split(' ');
             var primeiroNome = partes[0] || nomeEnx;
             var sobrenome = partes.slice(1).join(' ') || '';
-            await upsertRegistro(registroSheetId, primeiroNome, sobrenome, cargoEnx, unidadeEnx, uploads, {});
+            await upsertRegistro(registroSheetId, primeiroNome, sobrenome, cargoEnx, unidadeEnx, uploads, enxLinks||{});
             logDrive('Planilha atualizada ✓', 'ok');
           } catch(e) { logDrive('Erro planilha: ' + e.message, 'err'); }
         }
