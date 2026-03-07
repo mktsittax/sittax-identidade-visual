@@ -400,6 +400,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
   <button class="tab-btn" onclick="switchTab('boasvindas',this)">🎉 Boas-vindas</button>
   <button class="tab-btn" onclick="switchTab('assinatura',this)">✉ Assinatura de E-mail</button>
   <button class="tab-btn" onclick="switchTab('lote',this)">⚡ Geração em Lote</button>
+  <button class="tab-btn" onclick="switchTab('pesquisa',this)">🔍 Pesquisa</button>
 </div>
 
 <div class="card">
@@ -447,6 +448,40 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             <option value="f">Feminino (Bem-vinda)</option>
             <option value="m">Masculino (Bem-vindo)</option>
           </select>
+        </div>
+      </div>
+
+
+      <!-- Boas práticas para a foto -->
+      <div class="boas-praticas" style="margin-bottom:20px;">
+        <div class="boas-praticas-title">Boas práticas para a foto</div>
+        <div class="bp-item">
+          <div class="bp-icon ok">👔</div>
+          <div class="bp-text">
+            <strong>Roupa preta obrigatória</strong>
+            <span>A identidade visual da Sittax exige roupa preta em todas as fotos de colaboradores.</span>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-icon ok">🧑</div>
+          <div class="bp-text">
+            <strong>Rosto e ombros visíveis</strong>
+            <span>Enquadre do busto para cima, sem cortar a cabeça ou os ombros.</span>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-icon ok">💡</div>
+          <div class="bp-text">
+            <strong>Boa iluminação, fundo neutro</strong>
+            <span>Prefira fundo claro ou neutro — o remove.bg terá melhor resultado.</span>
+          </div>
+        </div>
+        <div class="bp-item">
+          <div class="bp-icon err">🚫</div>
+          <div class="bp-text">
+            <strong>Evite selfies e filtros</strong>
+            <span>Fotos com ângulo distorcido ou filtros prejudicam o recorte automático.</span>
+          </div>
         </div>
       </div>
 
@@ -752,7 +787,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
         </div>
         <div class="preview-frame"><canvas id="canvas"></canvas></div>
         <div class="html-out" id="html-out"></div>
-        <p class="copy-hint">📧 Cole o HTML no Gmail / Outlook &nbsp;·&nbsp; 🖼 Baixe o PNG para outros usos</p>
+
       </div>
     </div>
   </div>
@@ -830,6 +865,36 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
         </div>
 
       </div>
+    </div>
+  </div>
+
+  <!-- ══ ABA: PESQUISA ══ -->
+  <div class="tab-panel" id="tab-pesquisa">
+    <div class="card-head"><span class="pill">RH</span><h2>Pesquisa de Colaboradores</h2></div>
+    <div class="card-body">
+
+      <!-- Campo de busca -->
+      <div style="max-width:520px;margin:0 auto 28px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="pesq-input" type="text" placeholder="Digite o nome do colaborador..."
+            style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;"
+            onkeydown="if(event.key==='Enter') pesquisar()"
+            oninput="if(this.value==='') pesqClear()">
+          <button class="btn-orange" onclick="pesquisar()" style="padding:12px 24px;white-space:nowrap;">🔍 Buscar</button>
+        </div>
+        <div id="pesq-status" style="font-size:11px;color:#aaa;margin-top:6px;text-align:center;min-height:16px;"></div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="pesq-results" style="display:none;"></div>
+
+      <!-- Estado vazio -->
+      <div id="pesq-empty" style="text-align:center;padding:48px 24px;color:#bbb;">
+        <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+        <div style="font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px;">Pesquise um colaborador</div>
+        <div style="font-size:13px;">Digite o nome completo ou apenas o primeiro nome para buscar na planilha do Drive.</div>
+      </div>
+
     </div>
   </div>
 
@@ -1639,12 +1704,26 @@ Nota: A=tudo ok, B=1 problema leve, C=2 problemas, D=3+ problemas. Seja direto e
     body.innerHTML = html2;
 
   } catch(err) {
-    var msg = err.message || '';
-    var hint = 'Erro: ' + msg;
-    if (msg.includes('API_KEY_INVALID') || msg.includes('400') || msg.includes('invalid')) hint = 'API key inválida — verifique em aistudio.google.com';
-    if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) hint = 'Cota gratuita do Gemini atingida. Aguarde o reset (geralmente 1 minuto) ou acesse aistudio.google.com para ver seu uso.';
-    body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ ' + hint + '</p>'
-      + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — abra o Console (F12) para mais detalhes.</p>';
+    var msg = (err.message || '').toLowerCase();
+    var titulo = '⚠ Verificador indisponível';
+    var detalhe = '';
+    if (msg.includes('api_key_invalid') || msg.includes('api key expired') || msg.includes('invalid_argument') || msg.includes('400')) {
+      titulo = '🔑 API Key inválida ou expirada';
+      detalhe = 'A chave do Google Gemini está incorreta ou vencida. Gere uma nova em <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--orange);">aistudio.google.com/apikey</a> e cole na seção de APIs abaixo.';
+    } else if (msg.includes('429') || msg.includes('quota') || msg.includes('resource_exhausted')) {
+      titulo = '⏳ Cota gratuita atingida';
+      detalhe = 'Você atingiu o limite de requisições gratuitas do Gemini. Aguarde alguns minutos e tente novamente, ou verifique seu uso em <a href="https://aistudio.google.com" target="_blank" style="color:var(--orange);">aistudio.google.com</a>.';
+    } else if (msg.includes('401') || msg.includes('403') || msg.includes('permission')) {
+      titulo = '🚫 Sem permissão';
+      detalhe = 'A chave não tem acesso à API Gemini. Confirme que a chave foi gerada em <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--orange);">aistudio.google.com/apikey</a>.';
+    } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed')) {
+      titulo = '🌐 Sem conexão';
+      detalhe = 'Não foi possível conectar ao servidor do Gemini. Verifique sua conexão com a internet.';
+    } else {
+      detalhe = 'Tente novamente em instantes. O verificador é opcional e não impede o uso da ferramenta.';
+    }
+    body.innerHTML = '<p style="font-size:13px;font-weight:700;color:#c43d00;margin-bottom:6px;">' + titulo + '</p>'
+      + '<p style="font-size:12px;color:#555;line-height:1.5;">' + detalhe + '</p>';
   }
 }
 
@@ -3305,6 +3384,150 @@ async function baixarLoteZip() {
 
 
 
+
+// ══════════════════════════════════════════════
+// ABA PESQUISA
+// ══════════════════════════════════════════════
+function pesqClear() {
+  document.getElementById('pesq-results').style.display = 'none';
+  document.getElementById('pesq-results').innerHTML = '';
+  document.getElementById('pesq-empty').style.display = 'block';
+  document.getElementById('pesq-status').textContent = '';
+}
+
+async function pesquisar() {
+  var query = (document.getElementById('pesq-input').value || '').trim().toLowerCase();
+  if (!query) return;
+
+  var status = document.getElementById('pesq-status');
+  var resultsEl = document.getElementById('pesq-results');
+  var emptyEl = document.getElementById('pesq-empty');
+
+  // Precisa estar autenticado no Drive
+  if (!driveToken) {
+    status.textContent = '⚠️ Conecte ao Google Drive primeiro (barra inferior).';
+    status.style.color = '#e03000';
+    return;
+  }
+
+  status.textContent = 'Buscando...';
+  status.style.color = '#aaa';
+  resultsEl.style.display = 'none';
+  resultsEl.innerHTML = '';
+  emptyEl.style.display = 'none';
+
+  try {
+    // Busca a planilha de registros
+    var q = "mimeType='application/vnd.google-apps.spreadsheet' and name='Registros de Colaboradores' and trashed=false";
+    var filesRes = await driveRequest('GET', 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&fields=files(id,name)');
+    if (!filesRes.files || filesRes.files.length === 0) {
+      status.textContent = '⚠️ Planilha "Registros de Colaboradores" não encontrada no Drive.';
+      status.style.color = '#e03000';
+      emptyEl.style.display = 'block';
+      return;
+    }
+
+    var sheetId = filesRes.files[0].id;
+    var dataRes = await driveRequest('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A1:M500');
+    var rows = dataRes.values || [];
+    if (rows.length <= 1) {
+      status.textContent = 'Nenhum colaborador cadastrado ainda.';
+      status.style.color = '#aaa';
+      emptyEl.style.display = 'block';
+      return;
+    }
+
+    // Filtra por nome (col A ou B contém o termo)
+    var matches = rows.slice(1).filter(function(row) {
+      var nome = ((row[0]||'') + ' ' + (row[1]||'')).toLowerCase();
+      return nome.includes(query);
+    });
+
+    if (matches.length === 0) {
+      status.textContent = 'Nenhum resultado para "' + document.getElementById('pesq-input').value + '".';
+      status.style.color = '#aaa';
+      emptyEl.style.display = 'block';
+      // Botão para ir ao enxoval
+      emptyEl.innerHTML = '<div style="font-size:40px;margin-bottom:12px;">😕</div>' +
+        '<div style="font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px;">Colaborador não encontrado</div>' +
+        '<div style="font-size:13px;margin-bottom:20px;">Nenhum resultado para <strong>"' + document.getElementById('pesq-input').value + '"</strong>.</div>' +
+        '<button class="btn-orange" onclick="pesqIrEnxoval()">✦ Criar enxoval para este colaborador</button>';
+      return;
+    }
+
+    // Renderiza cards
+    status.textContent = matches.length === 1 ? '1 colaborador encontrado.' : matches.length + ' colaboradores encontrados.';
+    status.style.color = '#aaa';
+
+    var html = '<div style="display:flex;flex-direction:column;gap:16px;">';
+    matches.forEach(function(row) {
+      var nome      = (row[0]||'') + ' ' + (row[1]||'');
+      var cargo     = row[2] || '—';
+      var unidade   = row[3] || '—';
+      var data      = row[4] || '—';
+      var avatar    = row[5] || '—';
+      var sig       = row[6] || '—';
+      var bv        = row[7] || '—';
+      var pct       = row[8] || '0%';
+      var statusTxt = row[9] || '⏳ Pendente';
+      var linkAv    = row[10] && row[10] !== '—' ? row[10] : null;
+      var linkSig   = row[11] && row[11] !== '—' ? row[11] : null;
+      var linkBv    = row[12] && row[12] !== '—' ? row[12] : null;
+
+      var statusColor = statusTxt.includes('Completo') ? '#16a34a' : statusTxt.includes('andamento') ? '#d97706' : '#9ca3af';
+
+      var checkBadge = function(label, val, link) {
+        var done = val === '✓';
+        var badge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;' +
+          (done ? 'background:#dcfce7;color:#16a34a;' : 'background:#f3f4f6;color:#9ca3af;') + '">' +
+          (done ? '✓' : '—') + ' ' + label + '</span>';
+        if (done && link) {
+          badge = '<a href="' + link + '" target="_blank" style="text-decoration:none;">' + badge + '</a>';
+        }
+        return badge;
+      };
+
+      html += '<div style="border:1.5px solid var(--border);border-radius:14px;padding:20px 24px;background:#fff;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">' +
+          '<div>' +
+            '<div style="font-size:17px;font-weight:800;color:var(--dark);margin-bottom:2px;">' + nome.trim() + '</div>' +
+            '<div style="font-size:13px;color:var(--gray);">' + cargo + ' &nbsp;·&nbsp; ' + unidade + '</div>' +
+            '<div style="font-size:11px;color:#bbb;margin-top:2px;">Cadastrado em ' + data + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+            '<span style="font-size:12px;font-weight:700;color:' + statusColor + ';">' + statusTxt + '</span>' +
+            '<span style="font-size:12px;font-weight:800;color:var(--orange);">' + pct + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;">' +
+          checkBadge('Avatar', avatar, linkAv) +
+          checkBadge('Assinatura', sig, linkSig) +
+          checkBadge('Boas-Vindas', bv, linkBv) +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+
+    resultsEl.innerHTML = html;
+    resultsEl.style.display = 'block';
+
+  } catch(e) {
+    status.textContent = 'Erro ao buscar: ' + e.message;
+    status.style.color = '#e03000';
+    emptyEl.style.display = 'block';
+  }
+}
+
+function pesqIrEnxoval() {
+  var nome = document.getElementById('pesq-input').value.trim();
+  var tabBtn = document.querySelector('[onclick*="switchTab(\'enxoval\'"]');
+  if (tabBtn) tabBtn.click();
+  setTimeout(function() {
+    var nomeEl = document.getElementById('enx-nome');
+    if (nomeEl && nome) { nomeEl.value = nome; }
+  }, 100);
+}
+
 </script>
 
 <!-- ── FOOTER ── -->
@@ -3412,4 +3635,37 @@ async function baixarLoteZip() {
 
 
 </body>
-</html>
+</html
+  <!-- ══ ABA: PESQUISA ══ -->
+  <div class="tab-panel" id="tab-pesquisa">
+    <div class="card-head"><span class="pill">RH</span><h2>Pesquisa de Colaboradores</h2></div>
+    <div class="card-body">
+
+      <!-- Campo de busca -->
+      <div style="max-width:520px;margin:0 auto 28px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <input id="pesq-input" type="text" placeholder="Digite o nome do colaborador..."
+            style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;"
+            onkeydown="if(event.key==='Enter') pesquisar()"
+            oninput="if(this.value==='') pesqClear()">
+          <button class="btn-orange" onclick="pesquisar()" style="padding:12px 24px;white-space:nowrap;">🔍 Buscar</button>
+        </div>
+        <div id="pesq-status" style="font-size:11px;color:#aaa;margin-top:6px;text-align:center;min-height:16px;"></div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="pesq-results" style="display:none;">
+        <!-- Preenchido via JS -->
+      </div>
+
+      <!-- Estado vazio -->
+      <div id="pesq-empty" style="text-align:center;padding:48px 24px;color:#bbb;">
+        <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+        <div style="font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px;">Pesquise um colaborador</div>
+        <div style="font-size:13px;">Digite o nome completo ou apenas o primeiro nome para buscar na planilha do Drive.</div>
+      </div>
+
+    </div>
+  </div>
+
+>
