@@ -560,7 +560,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             </div>
             <div class="slider-grid" style="margin-bottom:18px;">
               <label>Zoom</label>
-              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="document.getElementById('vz').textContent=parseFloat(this.value).toFixed(2);drawAv()">
+              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="avZoom=parseFloat(this.value);document.getElementById('vz').textContent=avZoom.toFixed(2);drawAv()">
               <span id="vz">1.00</span>
               <label>Brilho</label>
               <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('vb').textContent=parseFloat(this.value).toFixed(2);drawAv()">
@@ -1335,6 +1335,27 @@ var avImg = null;
 var avX = 0, avY = 0, avZoom = 1.0;
 var avDragging = false, avDragSX, avDragSY, avStartX, avStartY;
 var AV = 260;
+// Background image for avatar circle — load once on startup
+var _avBgLoaded = null;
+(function() {
+  var bg = new Image();
+  bg.onload = function() {
+    _avBgLoaded = bg;
+    // Redraw all previews that use this background
+    if (typeof drawAv === 'function') drawAv();
+    if (typeof drawSigPreview === 'function') drawSigPreview();
+    if (typeof drawBvPreview === 'function') drawBvPreview();
+    if (typeof drawEnx === 'function') drawEnx();
+  };
+  // Small orange gradient PNG encoded as data URL — fallback if no bg image asset
+  // Creates a 2x2 solid orange pixel — enough to fill via ctx.drawImage
+  var c = document.createElement('canvas'); c.width=4; c.height=4;
+  var cx = c.getContext('2d');
+  var g = cx.createRadialGradient(2,1.4,0,2,2,2);
+  g.addColorStop(0,'#F87A3A'); g.addColorStop(0.6,'#F05A1A'); g.addColorStop(1,'#C44010');
+  cx.fillStyle = g; cx.fillRect(0,0,4,4);
+  bg.src = c.toDataURL('image/png');
+})();
 
 function saveKey(v) {
   localStorage.setItem('rbg_key', v);
@@ -1459,8 +1480,11 @@ async function avProcessarFoto(originalB64) {
     '<img src="' + fotoFinal + '" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Foto carregada</span>';
 
   applyImgToAvatar(fotoFinal);
-  // Run AI checker
-  try { analisarFotoIA(fotoFinal); } catch(e) {}
+  // Show checker button instead of auto-running (saves Gemini quota)
+  var checker = document.getElementById('av-checker');
+  if (checker) checker.style.display = 'block';
+  var body = document.getElementById('av-checker-body');
+  if (body) body.innerHTML = '<button onclick="analisarFotoIA(avImg && document.getElementById(\'av-canvas\').toDataURL())" style="background:#F05A1A;color:#fff;border:none;border-radius:8px;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;">🔍 Analisar foto com IA</button><p style="font-size:11px;color:#bbb;margin-top:6px;">Clique para verificar boas práticas (usa cota do Gemini)</p>';
 }
 
 // ── Avatar action buttons ──
@@ -1546,9 +1570,9 @@ function applyImgToAvatar(imgSrc) {
   img.onload = function() {
     avImg = img;
     var scale = Math.max(AV / img.naturalWidth, AV / img.naturalHeight);
-    avZoom = scale;
-    document.getElementById('sl-zoom').value = Math.min(Math.max(scale, 0.5), 2.5);
-    document.getElementById('vz').textContent = parseFloat(avZoom).toFixed(2);
+    avZoom = Math.min(Math.max(scale, 0.5), 2.5);
+    document.getElementById('sl-zoom').value = avZoom;
+    document.getElementById('vz').textContent = avZoom.toFixed(2);
     avX = (AV - img.naturalWidth  * avZoom) / 2;
     avY = (AV - img.naturalHeight * avZoom) / 2;
     document.getElementById('av-controls').style.opacity = '1';
@@ -1663,8 +1687,8 @@ Nota: A=tudo ok, B=1 problema leve, C=2 problemas, D=3+ problemas. Seja direto e
   } catch(err) {
     var msg = err.message || '';
     var hint = 'Erro: ' + msg;
-    if (msg.includes('API_KEY_INVALID') || msg.includes('400')) hint = 'API key inválida — verifique em aistudio.google.com';
-    if (msg.includes('429')) hint = 'Limite de requisições atingido — tente novamente em instantes';
+    if (msg.includes('API_KEY_INVALID') || msg.includes('400') || msg.includes('invalid')) hint = 'API key inválida — verifique em aistudio.google.com';
+    if (msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) hint = 'Cota gratuita do Gemini atingida. Aguarde o reset (geralmente 1 minuto) ou acesse aistudio.google.com para ver seu uso.';
     body.innerHTML = '<p style="font-size:12px;color:#e03000;">⚠ ' + hint + '</p>'
       + '<p style="font-size:11px;color:#bbb;margin-top:6px;">O verificador é opcional — abra o Console (F12) para mais detalhes.</p>';
   }
