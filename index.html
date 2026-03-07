@@ -1338,23 +1338,31 @@ var AV = 260;
 // Background image for avatar circle — load once on startup
 var _avBgLoaded = null;
 (function() {
-  var bg = new Image();
-  bg.onload = function() {
-    _avBgLoaded = bg;
-    // Redraw all previews that use this background
-    if (typeof drawAv === 'function') drawAv();
-    if (typeof drawSigPreview === 'function') drawSigPreview();
-    if (typeof drawBvPreview === 'function') drawBvPreview();
-    if (typeof drawEnx === 'function') drawEnx();
-  };
-  // Small orange gradient PNG encoded as data URL — fallback if no bg image asset
-  // Creates a 2x2 solid orange pixel — enough to fill via ctx.drawImage
-  var c = document.createElement('canvas'); c.width=4; c.height=4;
-  var cx = c.getContext('2d');
-  var g = cx.createRadialGradient(2,1.4,0,2,2,2);
-  g.addColorStop(0,'#F87A3A'); g.addColorStop(0.6,'#F05A1A'); g.addColorStop(1,'#C44010');
-  cx.fillStyle = g; cx.fillRect(0,0,4,4);
-  bg.src = c.toDataURL('image/png');
+  // Load real bg from AV_BG (async), and meanwhile use a gradient as immediate fallback
+  // Gradient fallback — available immediately, no async
+  var fallback = document.createElement('canvas');
+  fallback.width = 260; fallback.height = 260;
+  var fctx = fallback.getContext('2d');
+  var fg = fctx.createLinearGradient(0, 0, 260, 260);
+  fg.addColorStop(0, '#FF7340'); fg.addColorStop(0.5, '#F05A1A'); fg.addColorStop(1, '#C04010');
+  fctx.fillStyle = fg; fctx.fillRect(0, 0, 260, 260);
+  // Set immediately as fallback
+  var fallbackImg = new Image();
+  fallbackImg.src = fallback.toDataURL('image/png');
+  fallbackImg.onload = function() { _avBgLoaded = fallbackImg; };
+
+  // Load real background
+  if (typeof AV_BG !== 'undefined' && AV_BG) {
+    var bg = new Image();
+    bg.onload = function() {
+      _avBgLoaded = bg;
+      if (typeof drawAv === 'function') drawAv();
+      if (typeof drawSigPreview === 'function') drawSigPreview();
+      if (typeof drawBvPreview === 'function') drawBvPreview();
+      if (typeof drawEnx === 'function') drawEnx();
+    };
+    bg.src = AV_BG;
+  }
 })();
 
 function saveKey(v) {
@@ -1394,12 +1402,12 @@ function drawAv() {
   ctx.save();
   ctx.beginPath(); ctx.arc(r, r, r - 4, 0, Math.PI*2); ctx.clip();
 
-  // Fundo gradiente
+  // Fundo
   if (_avBgLoaded && _avBgLoaded.complete) {
     ctx.drawImage(_avBgLoaded, 0, 0, AV, AV);
   } else {
-    var g = ctx.createRadialGradient(r, r*0.7, 0, r, r, r);
-    g.addColorStop(0, '#F05A1A'); g.addColorStop(0.6, '#F05A1A'); g.addColorStop(1, 'rgba(240,90,26,0)');
+    var g = ctx.createLinearGradient(0, 0, AV, AV);
+    g.addColorStop(0,'#FF7340'); g.addColorStop(0.5,'#F05A1A'); g.addColorStop(1,'#C04010');
     ctx.fillStyle = g; ctx.fillRect(0, 0, AV, AV);
   }
 
@@ -2073,9 +2081,10 @@ function bvWrapWords(ctx, text, maxW) {
 
 
 
-function baixarBV() {
+async function baixarBV() {
   var cvs2=document.createElement('canvas');
-  bvDraw(cvs2,1080).then(function(){
+  await bvDraw(cvs2,1080);
+  (function(){
     var url=cvs2.toDataURL('image/png',1.0);
     var n=document.getElementById('bv-name').value.trim()||'boasvindas';
     var a=document.createElement('a');
@@ -2135,6 +2144,10 @@ function enxGetCanvasAsAvatar() {
   var pad = 8 * scale;
   if (_avBgLoaded && _avBgLoaded.complete) {
     ctx.drawImage(_avBgLoaded, -pad, -pad, 520+pad*2, 520+pad*2);
+  } else {
+    var gFb = ctx.createLinearGradient(0, 0, 520, 520);
+    gFb.addColorStop(0,'#FF7340'); gFb.addColorStop(0.5,'#F05A1A'); gFb.addColorStop(1,'#C04010');
+    ctx.fillStyle = gFb; ctx.fillRect(-pad, -pad, 520+pad*2, 520+pad*2);
   }
 
   if (enxImg) {
@@ -2413,6 +2426,11 @@ async function gerarEnxoval() {
     document.getElementById('bv-gender').value = gender;
 
     var bvCvs = document.createElement('canvas');
+    await document.fonts.ready;
+    // Give _avBgLoaded time to be ready
+    if (!_avBgLoaded || !_avBgLoaded.complete) {
+      await new Promise(function(r){ setTimeout(r, 200); });
+    }
     await bvDraw(bvCvs, 1080);
     enxAssets.bv = bvCvs.toDataURL('image/png',1.0);
 
