@@ -596,6 +596,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             <canvas id="av-canvas" width="260" height="260"></canvas>
           </div>
           <div class="av-hint" id="av-hint">Aguardando foto...</div>
+          <div id="av-rbg-status" style="font-size:11px;color:#e03000;min-height:14px;margin-top:2px;text-align:center;"></div>
         </div>
 
       </div>
@@ -612,7 +613,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
           <div class="form-row" style="margin-bottom:18px;">
             <div class="field">
               <label>Nome completo</label>
-              <input id="bv-name" type="text" placeholder="Ex: Ana Nunes" oninput="bvTitleCase(this);bvUpdate()">
+              <input id="bv-name" type="text" placeholder="Ex: Ana Nunes" oninput="titleCase(this);bvUpdate()">
             </div>
             <div class="field">
               <label>Cargo</label>
@@ -921,6 +922,7 @@ function switchTab(id, btn) {
 // ABA 1 — ASSINATURA
 // ══════════════════════════════════════
 var photoB64 = null;
+var bvPhotoB64 = null;
 
 function titleCase(el) {
   var pos = el.selectionStart;
@@ -1002,7 +1004,63 @@ document.addEventListener('DOMContentLoaded', function() {
     sigX=sigStartX+(t.clientX-sigDragSX); sigY=sigStartY+(t.clientY-sigDragSY); drawSigPreview(); photoB64=sigGetAvatarB64(); liveUpdate();
   });
   document.addEventListener('touchend',function(){ sigDragging=false; });
+})
+// ── Avatar drag/zoom/touch listeners ──
+document.addEventListener('DOMContentLoaded', function() {
+  drawAv();
+  var avWrap = document.getElementById('av-wrap');
+  if (!avWrap) return;
+
+  // Mouse drag
+  avWrap.addEventListener('mousedown', function(e) {
+    if (!avImg) return;
+    avDragging=true; avDragSX=e.clientX; avDragSY=e.clientY;
+    avStartX=avX; avStartY=avY; avWrap.style.cursor='grabbing'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!avDragging) return;
+    avX=avStartX+(e.clientX-avDragSX); avY=avStartY+(e.clientY-avDragSY); drawAv();
+  });
+  document.addEventListener('mouseup', function() { avDragging=false; if(avWrap) avWrap.style.cursor='grab'; });
+
+  // Touch drag
+  avWrap.addEventListener('touchstart', function(e) {
+    if (!avImg) return;
+    var t=e.touches[0];
+    avDragging=true; avDragSX=t.clientX; avDragSY=t.clientY;
+    avStartX=avX; avStartY=avY; e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchmove', function(e) {
+    if (!avDragging) return;
+    var t=e.touches[0];
+    avX=avStartX+(t.clientX-avDragSX); avY=avStartY+(t.clientY-avDragSY); drawAv(); e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchend', function() { avDragging=false; });
+
+  // Wheel zoom
+  avWrap.addEventListener('wheel', function(e) {
+    if (!avImg) return;
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? -0.05 : 0.05;
+    avZoom = Math.min(Math.max(avZoom + delta, 0.5), 2.5);
+    document.getElementById('sl-zoom').value = avZoom;
+    document.getElementById('vz').textContent = avZoom.toFixed(2);
+    drawAv();
+  }, {passive:false});
+
+  // Restore saved Gemini key
+  try {
+    var k = localStorage.getItem('anthropic_key');
+    if (k) {
+      var el = document.getElementById('inp-anthropic-key');
+      if (el) { el.value = k; }
+      var st = document.getElementById('anthropic-key-status');
+      if (st) { st.textContent = '✓ Chave salva'; st.style.color = '#22c55e'; }
+    }
+  } catch(e) {}
 });
+
+;
 
 function loadPhoto(input) {
   if (!input.files || !input.files[0]) return;
@@ -1294,6 +1352,189 @@ function setAvHint(msg, color) {
   var el = document.getElementById('av-hint');
   el.textContent = msg;
   el.style.color = color || 'var(--gray)';
+}
+
+// ── DRAW AVATAR PREVIEW ──
+function drawAv() {
+  var cvs = document.getElementById('av-canvas');
+  if (!cvs) return;
+  var ctx = cvs.getContext('2d');
+  cvs.width = AV; cvs.height = AV;
+  var r = AV / 2;
+
+  // Aro externo cinza
+  ctx.save();
+  ctx.beginPath(); ctx.arc(r, r, r, 0, Math.PI*2);
+  ctx.fillStyle = '#e0e0e0'; ctx.fill(); ctx.restore();
+
+  // Círculo interior com clip
+  ctx.save();
+  ctx.beginPath(); ctx.arc(r, r, r - 4, 0, Math.PI*2); ctx.clip();
+
+  // Fundo gradiente
+  if (_avBgLoaded && _avBgLoaded.complete) {
+    ctx.drawImage(_avBgLoaded, 0, 0, AV, AV);
+  } else {
+    var g = ctx.createRadialGradient(r, r*0.7, 0, r, r, r);
+    g.addColorStop(0, '#F05A1A'); g.addColorStop(0.6, '#F05A1A'); g.addColorStop(1, 'rgba(240,90,26,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, AV, AV);
+  }
+
+  // Foto
+  if (avImg) {
+    var b = parseFloat(document.getElementById('sl-bright') ? document.getElementById('sl-bright').value : 1);
+    ctx.filter = 'brightness(' + b + ')';
+    ctx.drawImage(avImg, avX, avY, avImg.naturalWidth * avZoom, avImg.naturalHeight * avZoom);
+    ctx.filter = 'none';
+  }
+  ctx.restore();
+}
+
+// ── LOAD AVATAR PHOTO ──
+function loadAv(input) {
+  if (!input.files || !input.files[0]) return;
+  var r = new FileReader();
+  r.onload = function(e) {
+    var original = e.target.result;
+    document.getElementById('lbl-av').innerHTML =
+      '<img src="' + original + '" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Processando...</span>';
+    var ctrl = document.getElementById('av-controls');
+    var hint = document.getElementById('av-hint');
+    if (ctrl) { ctrl.style.opacity = '.35'; ctrl.style.pointerEvents = 'none'; }
+    if (hint) hint.textContent = '⏳ Removendo fundo...';
+    // Loading visual
+    var cvs = document.getElementById('av-canvas');
+    if (cvs) {
+      var ctx2 = cvs.getContext('2d'); cvs.width = AV; cvs.height = AV;
+      ctx2.save(); ctx2.beginPath(); ctx2.arc(AV/2,AV/2,AV/2,0,Math.PI*2); ctx2.clip();
+      ctx2.fillStyle = '#F05A1A'; ctx2.fillRect(0,0,AV,AV);
+      ctx2.font = 'bold 11px sans-serif'; ctx2.fillStyle = '#fff';
+      ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+      ctx2.fillText('Removendo fundo...', AV/2, AV/2); ctx2.restore();
+    }
+    avProcessarFoto(original);
+  };
+  r.readAsDataURL(input.files[0]);
+}
+
+// ── PROCESS AVATAR PHOTO (remove.bg + load into editor) ──
+async function avProcessarFoto(originalB64) {
+  // Resize to max 2000px first
+  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
+  var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
+  var fotoFinal = originalB64;
+  var hint = document.getElementById('av-hint');
+
+  if (apiKey) {
+    try {
+      var res = await fetch('https://api.remove.bg/v1.0/removebg', {
+        method: 'POST',
+        headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_file_b64: originalB64.split(',')[1], size: 'auto', format: 'png' })
+      });
+      if (res.ok) {
+        var blob = await res.blob();
+        fotoFinal = await new Promise(function(resolve) {
+          var fr = new FileReader(); fr.onload = function(ev) { resolve(ev.target.result); }; fr.readAsDataURL(blob);
+        });
+        if (hint) hint.textContent = '✓ Fundo removido — arraste para ajustar';
+      } else {
+        var errJson = await res.json().catch(function(){return {};});
+        var errMsg = (errJson.errors && errJson.errors[0] && errJson.errors[0].title) || ('HTTP ' + res.status);
+        document.getElementById('av-rbg-status') && (document.getElementById('av-rbg-status').textContent = '⚠ Erro ao remover fundo: ' + errMsg);
+        if (hint) hint.textContent = 'Arraste para ajustar posição';
+      }
+    } catch(e) {
+      if (hint) hint.textContent = 'Arraste para ajustar posição';
+    }
+  } else {
+    if (hint) hint.textContent = 'Arraste para ajustar posição';
+  }
+
+  document.getElementById('lbl-av').innerHTML =
+    '<img src="' + fotoFinal + '" class="thumb-photo"><span class="upload-name" style="color:#22c55e">✓ Foto carregada</span>';
+
+  applyImgToAvatar(fotoFinal);
+  // Run AI checker
+  try { analisarFotoIA(fotoFinal); } catch(e) {}
+}
+
+// ── Avatar action buttons ──
+function baixarAv() {
+  var cvs = document.createElement('canvas');
+  cvs.width = AV; cvs.height = AV;
+  // Re-draw at full size
+  var ctx = cvs.getContext('2d');
+  var r = AV / 2;
+  ctx.save(); ctx.beginPath(); ctx.arc(r,r,r,0,Math.PI*2);
+  ctx.fillStyle='#e0e0e0'; ctx.fill(); ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.arc(r,r,r-4,0,Math.PI*2); ctx.clip();
+  if (_avBgLoaded && _avBgLoaded.complete) {
+    ctx.drawImage(_avBgLoaded,0,0,AV,AV);
+  } else {
+    var g=ctx.createRadialGradient(r,r*0.7,0,r,r,r);
+    g.addColorStop(0,'#F05A1A'); g.addColorStop(0.6,'#F05A1A'); g.addColorStop(1,'rgba(240,90,26,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,AV,AV);
+  }
+  if (avImg) {
+    var b = parseFloat(document.getElementById('sl-bright').value||1);
+    ctx.filter='brightness('+b+')';
+    ctx.drawImage(avImg, avX, avY, avImg.naturalWidth*avZoom, avImg.naturalHeight*avZoom);
+    ctx.filter='none';
+  }
+  ctx.restore();
+  var nome = (document.getElementById('av-nome') && document.getElementById('av-nome').value.trim()) || 'avatar';
+  var url = cvs.toDataURL('image/png', 1.0);
+  var a = document.createElement('a');
+  a.href = url; a.download = nome.replace(/\s+/g,'_') + '_avatar.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function usarNaSig() {
+  // Pega o canvas atual do avatar e transfere para a aba assinatura
+  var avCvs = document.getElementById('av-canvas');
+  if (!avCvs || !avImg) { alert('Gere o avatar primeiro.'); return; }
+  var avDataUrl = avCvs.toDataURL('image/png', 1.0);
+  // Preenche nome e cargo na aba assinatura se disponíveis
+  var nomeAv = document.getElementById('av-nome') && document.getElementById('av-nome').value.trim();
+  var cargoAv = document.getElementById('av-cargo') && document.getElementById('av-cargo').value.trim();
+  if (nomeAv && document.getElementById('inp-name')) document.getElementById('inp-name').value = nomeAv;
+  if (cargoAv && document.getElementById('inp-role')) document.getElementById('inp-role').value = cargoAv;
+  // Carrega foto no editor de assinatura
+  var img = new Image();
+  img.onload = function() {
+    sigImg = img;
+    var scale = Math.max(SIG_CV / img.naturalWidth, SIG_CV / img.naturalHeight);
+    sigZoom = scale;
+    sigX = (SIG_CV - img.naturalWidth * scale) / 2;
+    sigY = (SIG_CV - img.naturalHeight * scale) / 2;
+    var sl = document.getElementById('sig-sl-zoom');
+    if (sl) sl.value = Math.min(Math.max(scale, 0.5), 2.5);
+    var vz = document.getElementById('sig-vz');
+    if (vz) vz.textContent = parseFloat(sigZoom).toFixed(2);
+    var ctrl = document.getElementById('sig-controls');
+    if (ctrl) { ctrl.style.opacity='1'; ctrl.style.pointerEvents='auto'; }
+    photoB64 = avDataUrl;
+    drawSigPreview();
+    liveUpdate();
+  };
+  img.src = avDataUrl;
+  switchTab('tab-assinatura');
+}
+
+function usarNoBV() {
+  var avCvs = document.getElementById('av-canvas');
+  if (!avCvs || !avImg) { alert('Gere o avatar primeiro.'); return; }
+  var avDataUrl = avCvs.toDataURL('image/png', 1.0);
+  var nomeAv = document.getElementById('av-nome') && document.getElementById('av-nome').value.trim();
+  var cargoAv = document.getElementById('av-cargo') && document.getElementById('av-cargo').value.trim();
+  if (nomeAv && document.getElementById('bv-name')) document.getElementById('bv-name').value = nomeAv;
+  if (cargoAv && document.getElementById('bv-role')) document.getElementById('bv-role').value = cargoAv;
+  bvPhotoB64 = avDataUrl;
+  var ctrl = document.getElementById('bv-controls');
+  if (ctrl) { ctrl.style.opacity='1'; ctrl.style.pointerEvents='auto'; }
+  bvUpdate();
+  switchTab('tab-boasvindas');
 }
 
 function applyImgToAvatar(imgSrc) {
@@ -1593,11 +1834,11 @@ async function bvProcessarFoto(originalB64) {
 function bvUpdate() {
   var n = document.getElementById('bv-name').value.trim();
   if (!n && !bvPhotoB64) return;
-  bvDraw(document.getElementById('bv-canvas'), 540);
+  bvDraw(document.getElementById('bv-canvas'), 540); // async fire-and-forget ok here
 }
 
-function bvGerar() {
-  bvDraw(document.getElementById('bv-canvas'), 540);
+async function bvGerar() {
+  await bvDraw(document.getElementById('bv-canvas'), 540);
   document.getElementById('bv-btns').style.display = 'block';
 }
 
@@ -1800,10 +2041,7 @@ function bvWrapWords(ctx, text, maxW) {
   if(line)lines.push(line); return lines;
 }
 
-function bvGerar() {
-  bvDraw(document.getElementById('bv-canvas'), 540);
-  document.getElementById('bv-btns').style.display='block';
-}
+
 
 function baixarBV() {
   var cvs2=document.createElement('canvas');
@@ -2609,7 +2847,7 @@ async function salvarTudoDrive() {
     else if (activeTab === 'tab-enxoval') {
       var nomeEnx = (document.getElementById('enx-nome') && document.getElementById('enx-nome').value.trim()) || 'Colaborador';
       var cargoEnx = (document.getElementById('enx-cargo') && document.getElementById('enx-cargo').value.trim()) || '';
-      var unidadeEnx = (document.getElementById('enx-unit') && document.getElementById('enx-unit').value.trim()) || '';
+      var unidadeEnx = (document.getElementById('enx-unidade') && document.getElementById('enx-unidade').value.trim()) || '';
 
       if (!enxAssets || (!enxAssets.avatar && !enxAssets.sig && !enxAssets.bv)) {
         logDrive('Gere o enxoval completo antes de salvar.', 'err');
