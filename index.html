@@ -2644,11 +2644,118 @@ async function getOrCreateRegistroSheet(registroFolderId) {
   });
 
   // Adiciona cabeçalho
-  var headers = [['Nome', 'Sobrenome', 'Cargo', 'Unidade', 'Data', 'Foto', 'Avatar', 'Assinatura', 'Boas-Vindas', '% Completo', 'Status', 'Link Avatar', 'Link Assinatura', 'Link Boas-Vindas']];
+  var headers = [['Nome', 'Sobrenome', 'Cargo', 'Unidade', 'Data', 'Avatar', 'Assinatura', 'Boas-Vindas', '% Completo', 'Status', 'Link Avatar', 'Link Assinatura', 'Link Boas-Vindas']];
   await driveRequest('POST',
     'https://sheets.googleapis.com/v4/spreadsheets/' + sheet.id + '/values/A1:append?valueInputOption=USER_ENTERED',
     { values: headers }
   );
+
+  // ── Formatação visual da planilha ──
+  var sheetId0 = 0; // default sheet id
+  // Primeiro busca o sheetId real
+  try {
+    var meta = await driveRequest('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + sheet.id + '?fields=sheets.properties');
+    if (meta.sheets && meta.sheets[0]) sheetId0 = meta.sheets[0].properties.sheetId;
+  } catch(e) {}
+
+  var orange    = { red: 0.941, green: 0.353, blue: 0.098 }; // #F05A19
+  var white     = { red: 1,     green: 1,     blue: 1     };
+  var darkBg    = { red: 0.118, green: 0.118, blue: 0.118 }; // #1e1e1e
+  var lightRow  = { red: 0.992, green: 0.953, blue: 0.937 }; // #FDF3EF soft orange tint
+  var altRow    = { red: 1,     green: 1,     blue: 1     };
+  var borderClr = { red: 0.941, green: 0.353, blue: 0.098 };
+
+  var requests = [
+    // Freeze row 1
+    { updateSheetProperties: { properties: { sheetId: sheetId0, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } },
+
+    // Header row: orange bg, white bold text, centered
+    { repeatCell: {
+      range: { sheetId: sheetId0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 13 },
+      cell: { userEnteredFormat: {
+        backgroundColor: orange,
+        textFormat: { foregroundColor: white, bold: true, fontSize: 10, fontFamily: 'Arial' },
+        horizontalAlignment: 'CENTER',
+        verticalAlignment: 'MIDDLE',
+        wrapStrategy: 'CLIP'
+      }},
+      fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment,wrapStrategy)'
+    }},
+
+    // Row height header = 32
+    { updateDimensionProperties: {
+      range: { sheetId: sheetId0, dimension: 'ROWS', startIndex: 0, endIndex: 1 },
+      properties: { pixelSize: 32 }, fields: 'pixelSize'
+    }},
+
+    // Data rows default style: font 10, vertical middle
+    { repeatCell: {
+      range: { sheetId: sheetId0, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 0, endColumnIndex: 13 },
+      cell: { userEnteredFormat: {
+        textFormat: { fontSize: 10, fontFamily: 'Arial' },
+        verticalAlignment: 'MIDDLE',
+        horizontalAlignment: 'LEFT',
+        wrapStrategy: 'CLIP'
+      }},
+      fields: 'userEnteredFormat(textFormat,verticalAlignment,horizontalAlignment,wrapStrategy)'
+    }},
+
+    // Cols F,G,H (Avatar, Assinatura, Boas-Vindas) centered
+    { repeatCell: {
+      range: { sheetId: sheetId0, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 5, endColumnIndex: 8 },
+      cell: { userEnteredFormat: { horizontalAlignment: 'CENTER' }},
+      fields: 'userEnteredFormat.horizontalAlignment'
+    }},
+
+    // Col I (% Completo) centered
+    { repeatCell: {
+      range: { sheetId: sheetId0, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 8, endColumnIndex: 9 },
+      cell: { userEnteredFormat: { horizontalAlignment: 'CENTER' }},
+      fields: 'userEnteredFormat.horizontalAlignment'
+    }},
+
+    // Col J (Status) centered
+    { repeatCell: {
+      range: { sheetId: sheetId0, startRowIndex: 1, endRowIndex: 500, startColumnIndex: 9, endColumnIndex: 10 },
+      cell: { userEnteredFormat: { horizontalAlignment: 'CENTER' }},
+      fields: 'userEnteredFormat.horizontalAlignment'
+    }},
+
+    // Column widths
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 140 }, fields: 'pixelSize' }}, // Nome
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 130 }, fields: 'pixelSize' }}, // Sobrenome
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 160 }, fields: 'pixelSize' }}, // Cargo
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 }, properties: { pixelSize: 130 }, fields: 'pixelSize' }}, // Unidade
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 4, endIndex: 5 }, properties: { pixelSize: 90  }, fields: 'pixelSize' }}, // Data
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 5, endIndex: 6 }, properties: { pixelSize: 70  }, fields: 'pixelSize' }}, // Avatar
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 6, endIndex: 7 }, properties: { pixelSize: 80  }, fields: 'pixelSize' }}, // Assinatura
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 7, endIndex: 8 }, properties: { pixelSize: 90  }, fields: 'pixelSize' }}, // Boas-Vindas
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 8, endIndex: 9 }, properties: { pixelSize: 80  }, fields: 'pixelSize' }}, // % Completo
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex: 9, endIndex:10 }, properties: { pixelSize: 110 }, fields: 'pixelSize' }}, // Status
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex:10, endIndex:11 }, properties: { pixelSize: 200 }, fields: 'pixelSize' }}, // Link Avatar
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex:11, endIndex:12 }, properties: { pixelSize: 200 }, fields: 'pixelSize' }}, // Link Assinatura
+    { updateDimensionProperties: { range: { sheetId: sheetId0, dimension: 'COLUMNS', startIndex:12, endIndex:13 }, properties: { pixelSize: 200 }, fields: 'pixelSize' }}, // Link Boas-Vindas
+
+    // Border on header
+    { updateBorders: {
+      range: { sheetId: sheetId0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 13 },
+      bottom: { style: 'SOLID_MEDIUM', color: { red: 0.7, green: 0.25, blue: 0.05 } }
+    }},
+
+    // Tab color
+    { updateSheetProperties: {
+      properties: { sheetId: sheetId0, tabColorStyle: { rgbColor: orange } },
+      fields: 'tabColorStyle'
+    }}
+  ];
+
+  try {
+    await driveRequest('POST',
+      'https://sheets.googleapis.com/v4/spreadsheets/' + sheet.id + ':batchUpdate',
+      { requests: requests }
+    );
+  } catch(e) { console.warn('Formatting error:', e); }
+
   return sheet.id;
 }
 
@@ -2667,10 +2774,10 @@ async function findRowByName(sheetId, nomeCompleto) {
 
 // ── Atualiza ou adiciona linha na planilha ──
 async function upsertRegistro(sheetId, nome, sobrenome, cargo, unidade, assets, links) {
+  // Cols: A=Nome B=Sobrenome C=Cargo D=Unidade E=Data F=Avatar G=Assinatura H=Boas-Vindas I=% J=Status K=LinkAv L=LinkSig M=LinkBv
   var nomeCompleto = (nome + ' ' + sobrenome).trim();
   var data = new Date().toLocaleDateString('pt-BR');
 
-  // Busca linha existente pelo nome completo (col A = nome, col B = sobrenome)
   var existingRow = -1;
   try {
     var readA = await driveRequest('GET',
@@ -2683,39 +2790,35 @@ async function upsertRegistro(sheetId, nome, sobrenome, cargo, unidade, assets, 
     }
   } catch(e) {}
 
-  // Lê valores atuais se linha existe
   var cur = [];
   if (existingRow > 1) {
     try {
       var exRead = await driveRequest('GET',
-        'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + existingRow + ':N' + existingRow);
+        'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A' + existingRow + ':M' + existingRow);
       cur = (exRead.values && exRead.values[0]) || [];
     } catch(e) {}
   }
 
-  // Monta checks — preserva ✓ existentes
-  var foto     = (cur[5]==='✓' || assets.includes('Foto'))         ? '✓' : '—';
-  var avatar   = (cur[6]==='✓' || assets.includes('Avatar'))       ? '✓' : '—';
-  var sig      = (cur[7]==='✓' || assets.includes('Assinatura'))   ? '✓' : '—';
-  var bv       = (cur[8]==='✓' || assets.includes('Boas-Vindas')) ? '✓' : '—';
+  // Checks (sem coluna Foto) — F=Avatar[5], G=Assinatura[6], H=Boas-Vindas[7]
+  var avatar = (cur[5]==='✓' || assets.includes('Avatar'))       ? '✓' : '—';
+  var sig    = (cur[6]==='✓' || assets.includes('Assinatura'))   ? '✓' : '—';
+  var bv     = (cur[7]==='✓' || assets.includes('Boas-Vindas')) ? '✓' : '—';
 
-  // Conta checks para % e status (sem fórmula — evita erro de referência)
-  var checkCount = [foto,avatar,sig,bv].filter(function(v){return v==='✓';}).length;
-  var pct = Math.round(checkCount / 4 * 100) + '%';
-  var status = checkCount === 4 ? 'Completo' : checkCount === 0 ? 'Pendente' : 'Em andamento';
+  var checkCount = [avatar, sig, bv].filter(function(v){ return v==='✓'; }).length;
+  var pct    = Math.round(checkCount / 3 * 100) + '%';
+  var status = checkCount === 3 ? '✅ Completo' : checkCount === 0 ? '⏳ Pendente' : '🔄 Em andamento';
 
-  // Links — preserva existentes, adiciona novos
-  var linkAv  = links.avatar || (cur[11] && cur[11] !== '—' ? cur[11] : '—');
-  var linkSig = links.sig    || (cur[12] && cur[12] !== '—' ? cur[12] : '—');
-  var linkBv  = links.bv     || (cur[13] && cur[13] !== '—' ? cur[13] : '—');
+  var linkAv  = links.avatar || (cur[10] && cur[10] !== '—' ? cur[10] : '—');
+  var linkSig = links.sig    || (cur[11] && cur[11] !== '—' ? cur[11] : '—');
+  var linkBv  = links.bv     || (cur[12] && cur[12] !== '—' ? cur[12] : '—');
 
   var rowData = [nome, sobrenome, cargo || (cur[2]||''), unidade || (cur[3]||''),
-    data, foto, avatar, sig, bv, pct, status, linkAv, linkSig, linkBv];
+    data, avatar, sig, bv, pct, status, linkAv, linkSig, linkBv];
 
   if (existingRow > 1) {
     await driveRequest('PUT',
       'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId +
-      '/values/A' + existingRow + ':N' + existingRow + '?valueInputOption=USER_ENTERED',
+      '/values/A' + existingRow + ':M' + existingRow + '?valueInputOption=USER_ENTERED',
       { values: [rowData] }
     );
   } else {
@@ -2725,6 +2828,31 @@ async function upsertRegistro(sheetId, nome, sobrenome, cargo, unidade, assets, 
       { values: [rowData] }
     );
   }
+
+  // Formata linhas de dados (alternância de cor)
+  try {
+    var sheetMeta = await driveRequest('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '?fields=sheets.properties');
+    var sid = sheetMeta.sheets && sheetMeta.sheets[0] ? sheetMeta.sheets[0].properties.sheetId : 0;
+    var rowIdx = existingRow > 1 ? existingRow - 1 : null;
+    if (rowIdx === null) {
+      // Nova linha inserida — conta quantas linhas existem agora
+      var countR = await driveRequest('GET', 'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + '/values/A:A');
+      rowIdx = (countR.values ? countR.values.length : 2) - 1;
+    }
+    var isEven = rowIdx % 2 === 0;
+    var rowBg = isEven
+      ? { red: 0.992, green: 0.953, blue: 0.937 } // #FDF3EF
+      : { red: 1, green: 1, blue: 1 };
+    await driveRequest('POST',
+      'https://sheets.googleapis.com/v4/spreadsheets/' + sheetId + ':batchUpdate',
+      { requests: [{ repeatCell: {
+        range: { sheetId: sid, startRowIndex: rowIdx, endRowIndex: rowIdx+1, startColumnIndex: 0, endColumnIndex: 13 },
+        cell: { userEnteredFormat: { backgroundColor: rowBg } },
+        fields: 'userEnteredFormat.backgroundColor'
+      }}]}
+    );
+  } catch(e) {}
+
   return existingRow;
 }
 
