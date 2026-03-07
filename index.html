@@ -1581,17 +1581,29 @@ function usarNoBV() {
   switchTab('tab-boasvindas');
 }
 
-function applyImgToAvatar(imgSrc) {
+async function applyImgToAvatar(imgSrc) {
+  // Redimensiona para AV*3 (780px) — garante coverScale adequado sem payload enorme
+  var editorSrc = await new Promise(function(resolve) {
+    var tmp = new Image();
+    tmp.onload = function() {
+      var TARGET = AV * 3;
+      var w = tmp.naturalWidth, h = tmp.naturalHeight;
+      if (w <= TARGET && h <= TARGET) { resolve(imgSrc); return; }
+      var sc = Math.min(TARGET / w, TARGET / h);
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+      c.getContext('2d').drawImage(tmp, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/png', 1.0));
+    };
+    tmp.src = imgSrc;
+  });
   var img = new Image();
   img.onload = function() {
     avImg = img;
-    var scale = Math.max(AV / img.naturalWidth, AV / img.naturalHeight);
-    // Cover zoom: fill the circle completely, centered
     var coverScale = Math.max(AV / img.naturalWidth, AV / img.naturalHeight);
     avZoom = Math.min(Math.max(coverScale, 0.5), 2.5);
     document.getElementById('sl-zoom').value = avZoom;
     document.getElementById('vz').textContent = avZoom.toFixed(2);
-    // Center the image in the canvas
     avX = (AV - img.naturalWidth  * avZoom) / 2;
     avY = (AV - img.naturalHeight * avZoom) / 2;
     document.getElementById('av-controls').style.opacity = '1';
@@ -1599,7 +1611,7 @@ function applyImgToAvatar(imgSrc) {
     setAvHint('Arraste para reposicionar');
     drawAv();
   };
-  img.src = imgSrc;
+  img.src = editorSrc;
 }
 
 
@@ -2356,27 +2368,41 @@ async function enxProcessarFoto(originalB64) {
     if (hint) hint.textContent = 'Arraste para ajustar posição';
   }
 
-  // Agora carrega no editor
+  // Redimensiona para ENX_CV*3 antes de carregar no editor
+  // Garante que coverScale >= ~0.33 → imagem sempre preenche o círculo
+  var editorSrc = await new Promise(function(resolve) {
+    var tmp = new Image();
+    tmp.onload = function() {
+      var TARGET = ENX_CV * 3; // 600px
+      var w = tmp.naturalWidth, h = tmp.naturalHeight;
+      if (w <= TARGET && h <= TARGET) { resolve(fotoFinal); return; }
+      var sc = Math.min(TARGET / w, TARGET / h);
+      var c = document.createElement('canvas');
+      c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+      c.getContext('2d').drawImage(tmp, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/png', 1.0));
+    };
+    tmp.src = fotoFinal;
+  });
+
+  // Carrega no editor
   var img = new Image();
   img.onload = function() {
     enxImg = img;
-    // Zoom inicial: cobre o círculo com a menor dimensão, sem exagero
+    // Cover zoom: garante que a imagem preenche o círculo
     var z0 = Math.max(ENX_CV / img.naturalWidth, ENX_CV / img.naturalHeight);
-    // Limita zoom máximo ao range do slider
     z0 = Math.min(Math.max(z0, 0.3), 3.0);
     document.getElementById('enx-sl-zoom').value = z0.toFixed(2);
     document.getElementById('enx-vz').textContent  = z0.toFixed(2);
     document.getElementById('enx-sl-bright').value = '1.0';
     document.getElementById('enx-vb').textContent  = '1.00';
-    // Centraliza
     enxX = (ENX_CV - img.naturalWidth  * z0) / 2;
     enxY = (ENX_CV - img.naturalHeight * z0) / 2;
     drawEnx();
-    // Libera controles
     var ctrl = document.getElementById('enx-controls');
     if (ctrl) { ctrl.style.opacity='1'; ctrl.style.pointerEvents='auto'; }
   };
-  img.src = fotoFinal;
+  img.src = editorSrc;
 }
 
 function enxSetStep(id, state) {
@@ -3404,7 +3430,7 @@ async function pesquisar() {
   var emptyEl = document.getElementById('pesq-empty');
 
   // Precisa estar autenticado no Drive
-  if (!driveToken) {
+  if (!gAccessToken) {
     status.textContent = '⚠️ Conecte ao Google Drive primeiro (barra inferior).';
     status.style.color = '#e03000';
     return;
