@@ -395,375 +395,17 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
 </header>
 
 <div class="tabs">
-  <button class="tab-btn active" onclick="switchTab('assinatura',this)">✉ Assinatura de E-mail</button>
+  <button class="tab-btn active" onclick="switchTab('enxoval',this)" style="background:linear-gradient(135deg,#F05A1A,#c43d00);color:#fff;">✦ Enxoval Completo</button>
   <button class="tab-btn" onclick="switchTab('avatar',this)">🧑 Gerador de Avatar</button>
   <button class="tab-btn" onclick="switchTab('boasvindas',this)">🎉 Boas-vindas</button>
+  <button class="tab-btn" onclick="switchTab('assinatura',this)">✉ Assinatura de E-mail</button>
   <button class="tab-btn" onclick="switchTab('lote',this)">⚡ Geração em Lote</button>
-  <button class="tab-btn" onclick="switchTab('enxoval',this)" style="background:linear-gradient(135deg,#F05A1A,#c43d00);color:#fff;">✦ Enxoval Completo</button>
 </div>
 
 <div class="card">
 
-  <!-- ══ ABA 1: ASSINATURA ══ -->
-  <div class="tab-panel active" id="tab-assinatura">
-    <div class="card-head"><span class="pill">RH</span><h2>Dados do colaborador</h2></div>
-    <div class="card-body">
-      <div class="form-row">
-        <div class="field">
-          <label>Nome completo</label>
-          <input id="inp-name" type="text" placeholder="Ex: Marina Alves" oninput="titleCase(this);liveUpdate()">
-        </div>
-        <div class="field">
-          <label>Cargo</label>
-          <input id="inp-role" type="text" placeholder="Ex: Assistente Financeiro" oninput="liveUpdate()">
-        </div>
-      </div>
-      <!-- Editor de foto da assinatura -->
-      <div class="enx-editor-grid" style="margin-bottom:20px;">
-        <div>
-          <label class="upload-label-btn" for="f-photo" id="lbl-photo">
-            <span class="upload-icon">🧑‍💼</span>
-            <span class="upload-name">Foto do colaborador</span>
-            <span class="upload-sub-text">PNG ou JPG — fundo removido automaticamente com API key do remove.bg</span>
-          </label>
-          <input type="file" id="f-photo" accept="image/*" style="display:none" onchange="loadPhoto(this)">
-          <div id="sig-controls" style="opacity:.35;pointer-events:none;margin-top:14px;">
-            <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
-            <div class="slider-grid">
-              <label>Zoom</label>
-              <input type="range" id="sig-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('sig-vz').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
-              <span id="sig-vz">1.00</span>
-              <label>Brilho</label>
-              <input type="range" id="sig-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('sig-vb').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
-              <span id="sig-vb">1.00</span>
-            </div>
-          </div>
-        </div>
-        <div class="av-right" style="min-height:auto;padding:16px;">
-          <div class="av-right-label">Prévia do Avatar</div>
-          <div id="sig-wrap" style="cursor:grab;">
-            <canvas id="sig-canvas-preview" width="200" height="200" style="border-radius:50%;display:block;max-width:200px;"></canvas>
-          </div>
-          <div class="av-hint" id="sig-hint" style="font-size:11px;margin-top:8px;">Aguardando foto...</div>
-        </div>
-      </div>
-      <button class="btn-gen" onclick="gerar()">✦ Gerar Assinatura de E-mail</button>
-      <div class="preview-section" id="preview">
-        <div class="preview-topbar">
-          <div class="live-badge"><div class="live-dot"></div>Pré-visualização</div>
-          <div class="action-btns">
-            <button class="btn-dark" id="btn-copy" onclick="copiarHTML()">📋 Copiar HTML</button>
-            <button class="btn-orange" id="btn-dl" onclick="baixarPNG()">⬇ Baixar PNG</button>
-          </div>
-        </div>
-        <div class="preview-frame"><canvas id="canvas"></canvas></div>
-        <div class="html-out" id="html-out"></div>
-        <p class="copy-hint">📧 Cole o HTML no Gmail / Outlook &nbsp;·&nbsp; 🖼 Baixe o PNG para outros usos</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ ABA 2: AVATAR ══ -->
-  <div class="tab-panel" id="tab-avatar">
-    <div class="card-head"><span class="pill">RH</span><h2>Gerador de Avatar</h2></div>
-    <div class="card-body">
-      <div class="av-layout">
-
-        <!-- Esquerda: controles -->
-        <div>
-          <div class="field" style="margin-bottom:14px;">
-            <label>🔑 API Key — remove.bg</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input id="inp-apikey" type="password" placeholder="Cole sua chave aqui"
-                style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
-                oninput="saveKey(this.value)">
-              <a href="https://www.remove.bg/api" target="_blank"
-                style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
-                Obter chave →
-              </a>
-            </div>
-            <span id="key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">50 imagens/mês grátis</span>
-          </div>
-
-          <!-- Anthropic API Key -->
-          <div class="field" style="margin-top:14px;">
-            <label>🤖 API Key — Google Gemini (Verificador IA)</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input id="inp-anthropic-key" type="password" placeholder="AIza..."
-                style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
-                oninput="saveAnthropicKey(this.value)">
-              <a href="https://aistudio.google.com/apikey" target="_blank"
-                style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
-                Obter chave →
-              </a>
-            </div>
-            <span id="anthropic-key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">Gratuita — 1.500 análises/dia</span>
-          </div>
-
-          <!-- Boas práticas -->
-          <div class="boas-praticas">
-            <div class="boas-praticas-title">Boas práticas para a foto</div>
-            <div class="bp-item">
-              <div class="bp-icon ok">👔</div>
-              <div class="bp-text">
-                <strong>Roupa preta obrigatória</strong>
-                <span>A identidade visual da Sittax exige roupa preta em todas as fotos de colaboradores.</span>
-              </div>
-            </div>
-            <div class="bp-item">
-              <div class="bp-icon ok">🧑</div>
-              <div class="bp-text">
-                <strong>Rosto e ombros visíveis</strong>
-                <span>Enquadre do busto para cima, sem cortar a cabeça ou os ombros.</span>
-              </div>
-            </div>
-            <div class="bp-item">
-              <div class="bp-icon ok">💡</div>
-              <div class="bp-text">
-                <strong>Boa iluminação, fundo neutro</strong>
-                <span>Prefira fundo claro ou neutro — o remove.bg terá melhor resultado.</span>
-              </div>
-            </div>
-            <div class="bp-item">
-              <div class="bp-icon err">🚫</div>
-              <div class="bp-text">
-                <strong>Evite selfies e filtros</strong>
-                <span>Fotos com ângulo distorcido ou filtros prejudicam o recorte automático.</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-row" style="margin-bottom:16px;">
-            <div class="field">
-              <label>Nome completo</label>
-              <input id="av-nome" type="text" placeholder="Ex: João Silva" oninput="this.value=this.value.replace(/\b\w/g,c=>c.toUpperCase())">
-            </div>
-            <div class="field">
-              <label>Cargo</label>
-              <input id="av-cargo" type="text" placeholder="Ex: Analista Financeiro">
-            </div>
-          </div>
-
-          <div class="field" style="margin-bottom:18px;">
-            <label>1. Foto do colaborador</label>
-            <label class="upload-label-btn" for="f-av" id="lbl-av" style="margin-bottom:0;">
-              <span class="upload-icon">📷</span>
-              <span class="upload-name">Selecionar foto</span>
-              <span class="upload-sub-text">PNG ou JPG — fundo será removido automaticamente</span>
-            </label>
-            <input type="file" id="f-av" accept="image/*" style="display:none" onchange="loadAv(this)">
-          </div>
-
-          <div id="av-controls" style="opacity:.35;pointer-events:none;">
-            <div class="field" style="margin-bottom:14px;">
-              <label>2. Ajustar encaixe — arraste a foto no círculo</label>
-            </div>
-            <div class="slider-grid" style="margin-bottom:18px;">
-              <label>Zoom</label>
-              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="avZoom=parseFloat(this.value);document.getElementById('vz').textContent=avZoom.toFixed(2);drawAv()">
-              <span id="vz">1.00</span>
-              <label>Brilho</label>
-              <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('vb').textContent=parseFloat(this.value).toFixed(2);drawAv()">
-              <span id="vb">1.00</span>
-            </div>
-            <div class="av-btns" style="margin-bottom:18px;display:flex;flex-wrap:wrap;gap:10px;">
-              <button class="btn-orange" onclick="baixarAv()" style="flex:1;">⬇ Baixar PNG</button>
-              <button class="btn-dark" onclick="usarNaSig()" style="flex:1;">→ Assinatura</button>
-              <button class="btn-dark" onclick="usarNoBV()" style="flex:1;background:#b84800;">→ Boas-vindas</button>
-            </div>
-          </div>
-
-          <div class="info-box" id="av-infobox">
-            💡 <strong>Como usar:</strong> Cole sua API key do remove.bg, faça upload da foto e o fundo será removido automaticamente. Depois <strong>arraste</strong> e ajuste o <strong>zoom</strong>.
-          </div>
-
-          <!-- Verificador IA -->
-          <div class="av-checker" id="av-checker" style="display:none;">
-            <div class="av-checker-header">
-              <span>🤖 Verificador de Boas Práticas</span>
-              <div class="av-nota nd" id="av-nota-badge">—</div>
-            </div>
-            <div class="av-checker-body" id="av-checker-body">
-              <div class="av-checker-loading">Analisando foto com IA...</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Direita: preview interativo -->
-        <div class="av-right">
-          <div class="av-right-label">Pré-visualização</div>
-          <div id="av-wrap">
-            <canvas id="av-canvas" width="260" height="260"></canvas>
-          </div>
-          <div class="av-hint" id="av-hint">Aguardando foto...</div>
-          <div id="av-rbg-status" style="font-size:11px;color:#e03000;min-height:14px;margin-top:2px;text-align:center;"></div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-  <!-- ══ ABA 3: BOAS-VINDAS ══ -->
-  <div class="tab-panel" id="tab-boasvindas">
-    <div class="card-head"><span class="pill">RH</span><h2>Gerador de Boas-vindas</h2></div>
-    <div class="card-body">
-      <div class="bv-layout">
-
-        <!-- Esquerda: formulário -->
-        <div>
-          <div class="form-row" style="margin-bottom:18px;">
-            <div class="field">
-              <label>Nome completo</label>
-              <input id="bv-name" type="text" placeholder="Ex: Ana Nunes" oninput="titleCase(this);bvUpdate()">
-            </div>
-            <div class="field">
-              <label>Cargo</label>
-              <input id="bv-role" type="text" placeholder="Ex: Gerente de Cobrança" oninput="bvUpdate()">
-            </div>
-          </div>
-          <div class="form-row" style="margin-bottom:18px;">
-            <div class="field">
-              <label>Unidade</label>
-              <select id="bv-unit" onchange="bvUpdate()" style="border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;width:100%;">
-                <option value="Sittax Matriz">Sittax Matriz</option>
-                <option value="Sittax Filial">Sittax Filial</option>
-              </select>
-            </div>
-            <div class="field">
-              <label>Gênero</label>
-              <select id="bv-gender" onchange="bvUpdate()" style="border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;width:100%;">
-                <option value="auto">Automático pelo nome</option>
-                <option value="m">Bem-vindo</option>
-                <option value="f">Bem-vinda</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Editor interativo foto BV -->
-          <div class="enx-editor-grid" style="margin-bottom:20px;">
-            <div>
-              <label class="upload-label-btn" for="f-bv" id="lbl-bv">
-                <span class="upload-icon">📷</span>
-                <span class="upload-name">Foto do colaborador</span>
-                <span class="upload-sub-text">PNG ou JPG — fundo removido automaticamente com API key do remove.bg</span>
-              </label>
-              <input type="file" id="f-bv" accept="image/*" style="display:none" onchange="loadBvPhoto(this)">
-              <div id="bv-controls" style="opacity:.35;pointer-events:none;margin-top:14px;">
-                <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
-                <div class="slider-grid">
-                  <label>Zoom</label>
-                  <input type="range" id="bv-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('bv-vz').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
-                  <span id="bv-vz">1.00</span>
-                  <label>Brilho</label>
-                  <input type="range" id="bv-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('bv-vb').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
-                  <span id="bv-vb">1.00</span>
-                </div>
-              </div>
-            </div>
-            <div class="av-right" style="min-height:auto;padding:16px;">
-              <div class="av-right-label">Prévia do Avatar</div>
-              <div id="bv-wrap" style="cursor:grab;">
-                <canvas id="bv-canvas-preview" width="200" height="200" style="border-radius:50%;display:block;max-width:200px;"></canvas>
-              </div>
-              <div class="av-hint" id="bv-editor-hint" style="font-size:11px;margin-top:8px;">Aguardando foto...</div>
-            </div>
-          </div>
-
-          <button class="btn-gen" onclick="bvGerar()">✦ Gerar Arte de Boas-vindas</button>
-          <div id="bv-btns" style="display:none;margin-top:14px;">
-            <button class="btn-orange" style="width:100%;" onclick="baixarBV()">⬇ Baixar PNG (1080×1080)</button>
-          </div>
-        </div>
-
-        <!-- Direita: preview -->
-        <div class="bv-canvas-wrap">
-          <div class="bv-canvas-label">Pré-visualização</div>
-          <canvas id="bv-canvas" width="540" height="540"></canvas>
-          <div style="font-size:11px;color:#bbb;text-align:center;">Preview 540px · Exporta 1080×1080px</div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ ABA 4: LOTE ══ -->
-  <div class="tab-panel" id="tab-lote">
-    <div class="card-head"><span class="pill">RH</span><h2>Geração em Lote</h2></div>
-    <div class="card-body">
-      <div class="lote-layout">
-
-        <!-- Instruções + upload CSV -->
-        <div class="lote-left">
-
-          <!-- Download template -->
-          <div class="lote-section">
-            <div class="lote-section-title">1. Baixe o modelo de planilha</div>
-            <p class="lote-desc">Preencha uma linha por colaborador. A coluna <code>foto</code> deve conter o nome exato do arquivo de imagem.</p>
-            <button class="btn-dark" style="margin-top:10px;" onclick="downloadCSVTemplate()">⬇ Baixar modelo CSV</button>
-          </div>
-
-          <!-- Upload CSV -->
-          <div class="lote-section">
-            <div class="lote-section-title">2. Envie a planilha preenchida</div>
-            <label class="upload-label-btn" for="f-lote-csv" id="lbl-lote-csv">
-              <span class="upload-icon">📄</span>
-              <span class="upload-name">Selecionar arquivo CSV</span>
-              <span class="upload-sub-text">Máx. 100 colaboradores por vez</span>
-            </label>
-            <input type="file" id="f-lote-csv" accept=".csv" style="display:none" onchange="loadLoteCSV(this)">
-          </div>
-
-          <!-- Upload fotos -->
-          <div class="lote-section">
-            <div class="lote-section-title">3. Envie as fotos</div>
-            <label class="upload-label-btn" for="f-lote-fotos" id="lbl-lote-fotos">
-              <span class="upload-icon">🗂</span>
-              <span class="upload-name">Selecionar fotos</span>
-              <span class="upload-sub-text">Selecione múltiplos arquivos de uma vez</span>
-            </label>
-            <input type="file" id="f-lote-fotos" accept="image/*" multiple style="display:none" onchange="loadLoteFotos(this)">
-          </div>
-
-          <!-- Opções -->
-          <div class="lote-section">
-            <div class="lote-section-title">4. Opções de geração</div>
-            <div class="lote-checks">
-              <label class="lote-check"><input type="checkbox" id="lote-opt-avatar" checked> Gerar Avatar PNG</label>
-              <label class="lote-check"><input type="checkbox" id="lote-opt-sig" checked> Gerar Assinatura PNG</label>
-              <label class="lote-check"><input type="checkbox" id="lote-opt-sheet"> Registrar no Google Sheets</label>
-            </div>
-          </div>
-
-          <button class="btn-gen" id="btn-lote-gerar" onclick="gerarLote()" disabled>⚡ Gerar tudo em lote</button>
-        </div>
-
-        <!-- Preview da tabela + progresso -->
-        <div class="lote-right">
-          <div class="lote-section-title" style="margin-bottom:12px;">Colaboradores carregados</div>
-          <div id="lote-table-wrap">
-            <div class="lote-empty">Nenhum CSV carregado ainda.<br>Siga os passos ao lado.</div>
-          </div>
-
-          <!-- Barra de progresso -->
-          <div id="lote-progress-wrap" style="display:none;margin-top:20px;">
-            <div class="lote-progress-label">
-              <span id="lote-progress-text">Preparando...</span>
-              <span id="lote-progress-pct">0%</span>
-            </div>
-            <div class="lote-progress-bar"><div class="lote-progress-fill" id="lote-progress-fill"></div></div>
-            <div id="lote-log" class="lote-log"></div>
-          </div>
-
-          <div id="lote-done-wrap" style="display:none;margin-top:16px;">
-            <button class="btn-orange" style="width:100%;" onclick="baixarLoteZip()">⬇ Baixar tudo (.zip)</button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
   <!-- ══ ABA 5: ENXOVAL COMPLETO ══ -->
-  <div class="tab-panel" id="tab-enxoval">
+  <div class="tab-panel active" id="tab-enxoval">
     <div class="card-head"><span class="pill" style="background:linear-gradient(135deg,#F05A1A,#c43d00);">NOVO</span><h2>Enxoval Completo</h2></div>
     <div class="card-body">
 
@@ -784,12 +426,12 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
       <!-- Formulário -->
       <div class="enx-form-grid">
         <div class="field">
-          <label>Nome completo</label>
+          <label>Nome e Sobrenome</label>
           <input id="enx-nome" type="text" placeholder="Ex: Ana Nunes" oninput="enxTitleCase(this)">
         </div>
         <div class="field">
           <label>Cargo</label>
-          <input id="enx-cargo" type="text" placeholder="Ex: Gerente de Cobrança">
+          <input id="enx-cargo" type="text" placeholder="Ex: Gerente de Cobrança" oninput="firstLetterCase(this)">
         </div>
         <div class="field">
           <label>Unidade</label>
@@ -876,7 +518,6 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
               <div class="enx-asset-name">Assinatura de E-mail</div>
               <div class="enx-asset-desc">PNG 700×130px · Gmail / Outlook</div>
               <div style="display:flex;gap:6px;">
-                <button class="enx-asset-btn secondary" onclick="enxCopiarHTML()" style="flex:1;">📋 Copiar HTML</button>
                 <button class="enx-asset-btn" onclick="enxBaixar('sig')" style="flex:1;">⬇ PNG</button>
               </div>
             </div>
@@ -899,6 +540,298 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
     </div>
   </div>
 
+
+
+  <!-- ══ ABA 2: AVATAR ══ -->
+  <div class="tab-panel" id="tab-avatar">
+    <div class="card-head"><span class="pill">RH</span><h2>Gerador de Avatar</h2></div>
+    <div class="card-body">
+      <div class="av-layout">
+
+        <!-- Esquerda: controles principais -->
+        <div>
+          <div class="form-row" style="margin-bottom:16px;">
+            <div class="field">
+              <label>Nome e Sobrenome</label>
+              <input id="av-nome" type="text" placeholder="Ex: João Silva" oninput="this.value=this.value.replace(/\b\w/g,c=>c.toUpperCase())">
+            </div>
+            <div class="field">
+              <label>Cargo</label>
+              <input id="av-cargo" type="text" placeholder="Ex: Analista Financeiro" oninput="firstLetterCase(this)">
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:18px;">
+            <label>1. Foto do colaborador</label>
+            <label class="upload-label-btn" for="f-av" id="lbl-av" style="margin-bottom:0;">
+              <span class="upload-icon">📷</span>
+              <span class="upload-name">Selecionar foto</span>
+              <span class="upload-sub-text">PNG ou JPG — fundo será removido automaticamente</span>
+            </label>
+            <input type="file" id="f-av" accept="image/*" style="display:none" onchange="loadAv(this)">
+          </div>
+
+          <div id="av-controls" style="opacity:.35;pointer-events:none;">
+            <div class="field" style="margin-bottom:14px;">
+              <label>2. Ajustar encaixe — arraste a foto no círculo</label>
+            </div>
+            <div class="slider-grid" style="margin-bottom:18px;">
+              <label>Zoom</label>
+              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="avZoom=parseFloat(this.value);document.getElementById('vz').textContent=avZoom.toFixed(2);drawAv()">
+              <span id="vz">1.00</span>
+              <label>Brilho</label>
+              <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('vb').textContent=parseFloat(this.value).toFixed(2);drawAv()">
+              <span id="vb">1.00</span>
+            </div>
+            <div class="av-btns" style="margin-bottom:18px;display:flex;flex-wrap:wrap;gap:10px;">
+              <button class="btn-orange" onclick="baixarAv()" style="flex:1;">⬇ Baixar PNG</button>
+              <button class="btn-dark" onclick="usarNaSig()" style="flex:1;">→ Assinatura</button>
+              <button class="btn-dark" onclick="usarNoBV()" style="flex:1;background:#b84800;">→ Boas-vindas</button>
+            </div>
+          </div>
+
+          <!-- Verificador IA -->
+          <div class="av-checker" id="av-checker" style="display:none;">
+            <div class="av-checker-header">
+              <span>🤖 Verificador de Boas Práticas</span>
+              <div class="av-nota nd" id="av-nota-badge">—</div>
+            </div>
+            <div class="av-checker-body" id="av-checker-body">
+              <div class="av-checker-loading">Analisando foto com IA...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direita: preview interativo -->
+        <div class="av-right">
+          <div class="av-right-label">Pré-visualização</div>
+          <div id="av-wrap">
+            <canvas id="av-canvas" width="260" height="260"></canvas>
+          </div>
+          <div class="av-hint" id="av-hint">Aguardando foto...</div>
+          <div id="av-rbg-status" style="font-size:11px;color:#e03000;min-height:14px;margin-top:2px;text-align:center;"></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+  <!-- ══ ABA 3: BOAS-VINDAS ══ -->
+  <div class="tab-panel" id="tab-boasvindas">
+    <div class="card-head"><span class="pill">RH</span><h2>Gerador de Boas-vindas</h2></div>
+    <div class="card-body">
+      <div class="bv-layout">
+
+        <!-- Esquerda: formulário -->
+        <div>
+          <div class="form-row" style="margin-bottom:18px;">
+            <div class="field">
+              <label>Nome e Sobrenome</label>
+              <input id="bv-name" type="text" placeholder="Ex: Ana Nunes" oninput="titleCase(this);bvUpdate()">
+            </div>
+            <div class="field">
+              <label>Cargo</label>
+              <input id="bv-role" type="text" placeholder="Ex: Gerente de Cobrança" oninput="firstLetterCase(this);bvUpdate()">
+            </div>
+          </div>
+          <div class="form-row" style="margin-bottom:18px;">
+            <div class="field">
+              <label>Unidade</label>
+              <select id="bv-unit" onchange="bvUpdate()" style="border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;width:100%;">
+                <option value="Sittax Matriz">Sittax Matriz</option>
+                <option value="Sittax Filial">Sittax Filial</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Gênero</label>
+              <select id="bv-gender" onchange="bvUpdate()" style="border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;width:100%;">
+                <option value="auto">Automático pelo nome</option>
+                <option value="m">Bem-vindo</option>
+                <option value="f">Bem-vinda</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Editor interativo foto BV -->
+          <div class="enx-editor-grid" style="margin-bottom:20px;">
+            <div>
+              <label class="upload-label-btn" for="f-bv" id="lbl-bv">
+                <span class="upload-icon">📷</span>
+                <span class="upload-name">Foto do colaborador</span>
+                <span class="upload-sub-text">PNG ou JPG — fundo removido automaticamente com API key do remove.bg</span>
+              </label>
+              <input type="file" id="f-bv" accept="image/*" style="display:none" onchange="loadBvPhoto(this)">
+              <div id="bv-controls" style="opacity:.35;pointer-events:none;margin-top:14px;">
+                <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
+                <div class="slider-grid">
+                  <label>Zoom</label>
+                  <input type="range" id="bv-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('bv-vz').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
+                  <span id="bv-vz">1.00</span>
+                  <label>Brilho</label>
+                  <input type="range" id="bv-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('bv-vb').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
+                  <span id="bv-vb">1.00</span>
+                </div>
+              </div>
+            </div>
+            <div class="av-right" style="min-height:auto;padding:16px;">
+              <div class="av-right-label">Prévia do Avatar</div>
+              <div id="bv-wrap" style="cursor:grab;">
+                <canvas id="bv-canvas-preview" width="200" height="200" style="border-radius:50%;display:block;max-width:200px;"></canvas>
+              </div>
+              <div class="av-hint" id="bv-editor-hint" style="font-size:11px;margin-top:8px;">Aguardando foto...</div>
+            </div>
+          </div>
+
+          <button class="btn-gen" onclick="bvGerar()">✦ Gerar Arte de Boas-vindas</button>
+          <div id="bv-btns" style="display:none;margin-top:14px;">
+            <button class="btn-orange" style="width:100%;" onclick="baixarBV()">⬇ Baixar PNG (1080×1080)</button>
+          </div>
+        </div>
+
+        <!-- Direita: preview -->
+        <div class="bv-canvas-wrap">
+          <div class="bv-canvas-label">Pré-visualização</div>
+          <canvas id="bv-canvas" width="540" height="540"></canvas>
+          <div style="font-size:11px;color:#bbb;text-align:center;">Preview 540px · Exporta 1080×1080px</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ABA 1: ASSINATURA ══ -->
+  <div class="tab-panel" id="tab-assinatura">
+    <div class="card-head"><span class="pill">RH</span><h2>Dados do colaborador</h2></div>
+    <div class="card-body">
+      <div class="form-row">
+        <div class="field">
+          <label>Nome e Sobrenome</label>
+          <input id="inp-name" type="text" placeholder="Ex: Ana Nunes" oninput="titleCase(this);liveUpdate()">
+        </div>
+        <div class="field">
+          <label>Cargo</label>
+          <input id="inp-role" type="text" placeholder="Ex: Assistente Financeiro" oninput="firstLetterCase(this);liveUpdate()">
+        </div>
+      </div>
+      <!-- Editor de foto da assinatura -->
+      <div class="enx-editor-grid" style="margin-bottom:20px;">
+        <div>
+          <label class="upload-label-btn" for="f-photo" id="lbl-photo">
+            <span class="upload-icon">🧑‍💼</span>
+            <span class="upload-name">Foto do colaborador</span>
+            <span class="upload-sub-text">PNG ou JPG — fundo removido automaticamente com API key do remove.bg</span>
+          </label>
+          <input type="file" id="f-photo" accept="image/*" style="display:none" onchange="loadPhoto(this)">
+          <div id="sig-controls" style="opacity:.35;pointer-events:none;margin-top:14px;">
+            <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
+            <div class="slider-grid">
+              <label>Zoom</label>
+              <input type="range" id="sig-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('sig-vz').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
+              <span id="sig-vz">1.00</span>
+              <label>Brilho</label>
+              <input type="range" id="sig-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('sig-vb').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
+              <span id="sig-vb">1.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="av-right" style="min-height:auto;padding:16px;">
+          <div class="av-right-label">Prévia do Avatar</div>
+          <div id="sig-wrap" style="cursor:grab;">
+            <canvas id="sig-canvas-preview" width="200" height="200" style="border-radius:50%;display:block;max-width:200px;"></canvas>
+          </div>
+          <div class="av-hint" id="sig-hint" style="font-size:11px;margin-top:8px;">Aguardando foto...</div>
+        </div>
+      </div>
+      <button class="btn-gen" onclick="gerar()">✦ Gerar Assinatura de E-mail</button>
+      <div class="preview-section" id="preview">
+        <div class="preview-topbar">
+          <div class="live-badge"><div class="live-dot"></div>Pré-visualização</div>
+          <div class="action-btns">
+            <button class="btn-orange" id="btn-dl" onclick="baixarPNG()">⬇ Baixar PNG</button>
+          </div>
+        </div>
+        <div class="preview-frame"><canvas id="canvas"></canvas></div>
+        <div class="html-out" id="html-out"></div>
+        <p class="copy-hint">📧 Cole o HTML no Gmail / Outlook &nbsp;·&nbsp; 🖼 Baixe o PNG para outros usos</p>
+      </div>
+    </div>
+  </div>
+  <!-- ══ ABA 4: LOTE ══ -->
+  <div class="tab-panel" id="tab-lote">
+    <div class="card-head"><span class="pill">RH</span><h2>Geração em Lote</h2></div>
+    <div class="card-body">
+      <div class="lote-layout">
+
+        <!-- Instruções + upload CSV -->
+        <div class="lote-left">
+
+          <!-- Download template -->
+          <div class="lote-section">
+            <div class="lote-section-title">1. Baixe o modelo de planilha</div>
+            <p class="lote-desc">Preencha uma linha por colaborador. A coluna <code>foto</code> deve conter o nome exato do arquivo de imagem.</p>
+            <button class="btn-dark" style="margin-top:10px;" onclick="downloadCSVTemplate()">⬇ Baixar modelo CSV</button>
+          </div>
+
+          <!-- Upload CSV -->
+          <div class="lote-section">
+            <div class="lote-section-title">2. Envie a planilha preenchida</div>
+            <label class="upload-label-btn" for="f-lote-csv" id="lbl-lote-csv">
+              <span class="upload-icon">📄</span>
+              <span class="upload-name">Selecionar arquivo CSV</span>
+              <span class="upload-sub-text">Máx. 100 colaboradores por vez</span>
+            </label>
+            <input type="file" id="f-lote-csv" accept=".csv" style="display:none" onchange="loadLoteCSV(this)">
+          </div>
+
+          <!-- Upload fotos -->
+          <div class="lote-section">
+            <div class="lote-section-title">3. Envie as fotos</div>
+            <label class="upload-label-btn" for="f-lote-fotos" id="lbl-lote-fotos">
+              <span class="upload-icon">🗂</span>
+              <span class="upload-name">Selecionar fotos</span>
+              <span class="upload-sub-text">Selecione múltiplos arquivos de uma vez</span>
+            </label>
+            <input type="file" id="f-lote-fotos" accept="image/*" multiple style="display:none" onchange="loadLoteFotos(this)">
+          </div>
+
+          <!-- Opções -->
+          <div class="lote-section">
+            <div class="lote-section-title">4. Opções de geração</div>
+            <div class="lote-checks">
+              <label class="lote-check"><input type="checkbox" id="lote-opt-avatar" checked> Gerar Avatar PNG</label>
+              <label class="lote-check"><input type="checkbox" id="lote-opt-sig" checked> Gerar Assinatura PNG</label>
+              <label class="lote-check"><input type="checkbox" id="lote-opt-sheet"> Registrar no Google Sheets</label>
+            </div>
+          </div>
+
+          <button class="btn-gen" id="btn-lote-gerar" onclick="gerarLote()" disabled>⚡ Gerar tudo em lote</button>
+        </div>
+
+        <!-- Preview da tabela + progresso -->
+        <div class="lote-right">
+          <div class="lote-section-title" style="margin-bottom:12px;">Colaboradores carregados</div>
+          <div id="lote-table-wrap">
+            <div class="lote-empty">Nenhum CSV carregado ainda.<br>Siga os passos ao lado.</div>
+          </div>
+
+          <!-- Barra de progresso -->
+          <div id="lote-progress-wrap" style="display:none;margin-top:20px;">
+            <div class="lote-progress-label">
+              <span id="lote-progress-text">Preparando...</span>
+              <span id="lote-progress-pct">0%</span>
+            </div>
+            <div class="lote-progress-bar"><div class="lote-progress-fill" id="lote-progress-fill"></div></div>
+            <div id="lote-log" class="lote-log"></div>
+          </div>
+
+          <div id="lote-done-wrap" style="display:none;margin-top:16px;">
+            <button class="btn-orange" style="width:100%;" onclick="baixarLoteZip()">⬇ Baixar tudo (.zip)</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
 
 </div>
@@ -927,6 +860,15 @@ var bvPhotoB64 = null;
 function titleCase(el) {
   var pos = el.selectionStart;
   var v = el.value.toLowerCase().replace(/(^|\s)\S/g, function(c){ return c.toUpperCase(); });
+  if (el.value !== v) { el.value = v; el.setSelectionRange(pos, pos); }
+}
+// Only capitalizes the very first letter — preserves user casing for rest (for cargos like CTO, COO)
+function firstLetterCase(el) {
+  var pos = el.selectionStart;
+  var v = el.value;
+  if (v.length > 0) {
+    v = v.charAt(0).toUpperCase() + v.slice(1);
+  }
   if (el.value !== v) { el.value = v; el.setSelectionRange(pos, pos); }
 }
 
@@ -1497,25 +1439,26 @@ async function avProcessarFoto(originalB64) {
 
 // ── Avatar action buttons ──
 function baixarAv() {
+  // Export at 520px (2x) for crisp quality
+  var OUT = 520, sc = OUT / AV;
   var cvs = document.createElement('canvas');
-  cvs.width = AV; cvs.height = AV;
-  // Re-draw at full size
+  cvs.width = OUT; cvs.height = OUT;
   var ctx = cvs.getContext('2d');
-  var r = AV / 2;
-  ctx.save(); ctx.beginPath(); ctx.arc(r,r,r,0,Math.PI*2);
+  ctx.save(); ctx.beginPath(); ctx.arc(OUT/2,OUT/2,OUT/2,0,Math.PI*2);
   ctx.fillStyle='#e0e0e0'; ctx.fill(); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.arc(r,r,r-4,0,Math.PI*2); ctx.clip();
+  ctx.save(); ctx.beginPath(); ctx.arc(OUT/2,OUT/2,OUT/2-4*sc,0,Math.PI*2); ctx.clip();
   if (_avBgLoaded && _avBgLoaded.complete) {
-    ctx.drawImage(_avBgLoaded,0,0,AV,AV);
+    ctx.drawImage(_avBgLoaded,0,0,OUT,OUT);
   } else {
-    var g=ctx.createRadialGradient(r,r*0.7,0,r,r,r);
-    g.addColorStop(0,'#F05A1A'); g.addColorStop(0.6,'#F05A1A'); g.addColorStop(1,'rgba(240,90,26,0)');
-    ctx.fillStyle=g; ctx.fillRect(0,0,AV,AV);
+    var g=ctx.createLinearGradient(0,0,OUT,OUT);
+    g.addColorStop(0,'#FF7340'); g.addColorStop(0.5,'#F05A1A'); g.addColorStop(1,'#C04010');
+    ctx.fillStyle=g; ctx.fillRect(0,0,OUT,OUT);
   }
   if (avImg) {
     var b = parseFloat(document.getElementById('sl-bright').value||1);
     ctx.filter='brightness('+b+')';
-    ctx.drawImage(avImg, avX, avY, avImg.naturalWidth*avZoom, avImg.naturalHeight*avZoom);
+    // Scale avX/avY from preview (AV) to export (OUT)
+    ctx.drawImage(avImg, avX*sc, avY*sc, avImg.naturalWidth*avZoom*sc, avImg.naturalHeight*avZoom*sc);
     ctx.filter='none';
   }
   ctx.restore();
@@ -1578,9 +1521,12 @@ function applyImgToAvatar(imgSrc) {
   img.onload = function() {
     avImg = img;
     var scale = Math.max(AV / img.naturalWidth, AV / img.naturalHeight);
-    avZoom = Math.min(Math.max(scale, 0.5), 2.5);
+    // Cover zoom: fill the circle completely, centered
+    var coverScale = Math.max(AV / img.naturalWidth, AV / img.naturalHeight);
+    avZoom = Math.min(Math.max(coverScale, 0.5), 2.5);
     document.getElementById('sl-zoom').value = avZoom;
     document.getElementById('vz').textContent = avZoom.toFixed(2);
+    // Center the image in the canvas
     avX = (AV - img.naturalWidth  * avZoom) / 2;
     avY = (AV - img.naturalHeight * avZoom) / 2;
     document.getElementById('av-controls').style.opacity = '1';
@@ -2068,6 +2014,16 @@ function bvHeart(ctx,cx,cy,hs,rot){
   ctx.font=(hs*.60)+'px serif'; ctx.fillStyle='#fff';
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('🤍',0,hs*.04); ctx.restore();
+}
+
+function bvDetectGender(nome) {
+  // Terminations and names typically feminine in Portuguese
+  var n = nome.trim().split(' ')[0].toLowerCase();
+  var fem = ['a','ana','ia','ina','isa','ela','ila','ara','ura','ina','eira','anda','ilda','ilde'];
+  for (var i=0; i<fem.length; i++) { if (n.endsWith(fem[i])) return 'f'; }
+  var femNames = ['alice','beatriz','bruna','camila','carla','carolina','claudia','cristina','daniela','eduarda','elaine','elisa','fernanda','gabriela','giovana','helena','isabela','isabelle','jessica','joana','juliana','karen','larissa','leticia','livia','lorena','lucia','luisa','luiza','manuela','marcia','mariana','marina','milena','mirela','monica','natalia','nicole','patricia','paula','priscila','rafaela','renata','roberta','sabrina','sandra','silvia','simone','sophia','stefania','talita','tatiana','thais','valentina','vanessa','veronica','vitoria'];
+  if (femNames.indexOf(n) !== -1) return 'f';
+  return 'm';
 }
 
 function bvWrapWords(ctx, text, maxW) {
@@ -3224,6 +3180,47 @@ async function baixarLoteZip() {
 </script>
 
 <!-- ── FOOTER ── -->
+
+<!-- ── Configurações de API ── -->
+<div style="max-width:900px;margin:24px auto 0;padding:0 16px;">
+  <div style="border-top:1.5px solid var(--border);padding-top:24px;padding-bottom:24px;">
+    <div style="font-size:12px;font-weight:700;color:var(--gray);letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">🔧 Configurações de API</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+      <!-- remove.bg -->
+      <div class="field">
+        <label>🔑 API Key — remove.bg</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="inp-apikey" type="password" placeholder="Cole sua chave aqui"
+            style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
+            oninput="saveKey(this.value)">
+          <a href="https://www.remove.bg/api" target="_blank"
+            style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
+            Obter →
+          </a>
+        </div>
+        <span id="key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">50 imagens/mês grátis — usado em todas as abas</span>
+      </div>
+
+      <!-- Gemini -->
+      <div class="field">
+        <label>🤖 API Key — Google Gemini (Verificador IA)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="inp-anthropic-key" type="password" placeholder="AIza..."
+            style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:var(--dark);background:var(--light);outline:none;flex:1;"
+            oninput="saveAnthropicKey(this.value)">
+          <a href="https://aistudio.google.com/apikey" target="_blank"
+            style="font-size:11px;color:var(--orange);white-space:nowrap;font-weight:700;text-decoration:none;">
+            Obter →
+          </a>
+        </div>
+        <span id="anthropic-key-status" style="font-size:10px;color:#bbb;margin-top:4px;display:block;">Gratuita — 1.500 análises/dia</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <footer class="app-footer">
   <img src="data:image/png;base64,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" class="footer-logo" alt="Sittax">
   <span class="footer-powered">Powered by <strong>Antônio Filho MKT</strong></span>
