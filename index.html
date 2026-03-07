@@ -1112,18 +1112,20 @@ async function resizeFotoParaUpload(b64, maxPx) {
   });
 }
 async function sigProcessarFoto(originalB64) {
-  // Redimensiona para max 2000px antes de processar
-  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
+  var fotoParaEditor = await resizeFotoParaUpload(originalB64, 1600);
+  var fotoParaApi    = await resizeFotoParaUpload(originalB64, 800);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
-  var fotoFinal = originalB64;
+  var fotoFinal = fotoParaEditor;
   var hint = document.getElementById('sig-hint');
 
   if (apiKey) {
     try {
-      var res = await fetch('https://api.remove.bg/v1.0/removebg', {
+      var rbgController = new AbortController();
+      var rbgTimeout = setTimeout(function(){ rbgController.abort(); }, 10000);
+      var res = await fetch('https://api.remove.bg/v1.0/removebg', { signal: rbgController.signal,
         method:'POST',
         headers:{'X-Api-Key':apiKey,'Content-Type':'application/json'},
-        body: JSON.stringify({image_file_b64: originalB64.split(',')[1], size:'auto', format:'png'})
+        body: JSON.stringify({image_file_b64: fotoParaApi.split(',')[1], size:'regular', format:'png'})
       });
       if (res.ok) {
         var blob = await res.blob();
@@ -1419,18 +1421,20 @@ function loadAv(input) {
 
 // ── PROCESS AVATAR PHOTO (remove.bg + load into editor) ──
 async function avProcessarFoto(originalB64) {
-  // Resize to max 2000px first
-  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
+  var fotoParaEditor = await resizeFotoParaUpload(originalB64, 1600);
+  var fotoParaApi    = await resizeFotoParaUpload(originalB64, 800);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
-  var fotoFinal = originalB64;
+  var fotoFinal = fotoParaEditor;
   var hint = document.getElementById('av-hint');
 
   if (apiKey) {
     try {
-      var res = await fetch('https://api.remove.bg/v1.0/removebg', {
+      var rbgController = new AbortController();
+      var rbgTimeout = setTimeout(function(){ rbgController.abort(); }, 10000);
+      var res = await fetch('https://api.remove.bg/v1.0/removebg', { signal: rbgController.signal,
         method: 'POST',
         headers: { 'X-Api-Key': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_file_b64: originalB64.split(',')[1], size: 'auto', format: 'png' })
+        body: JSON.stringify({ image_file_b64: fotoParaApi.split(',')[1], size: 'regular', format: 'png' })
       });
       if (res.ok) {
         var blob = await res.blob();
@@ -1783,18 +1787,20 @@ function loadBvPhoto(input) {
 }
 
 async function bvProcessarFoto(originalB64) {
-  // Redimensiona para max 2000px antes de processar
-  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
+  var fotoParaEditor = await resizeFotoParaUpload(originalB64, 1600);
+  var fotoParaApi    = await resizeFotoParaUpload(originalB64, 800);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
-  var fotoFinal = originalB64;
+  var fotoFinal = fotoParaEditor;
   var hint = document.getElementById('bv-editor-hint');
 
   if (apiKey) {
     try {
-      var res = await fetch('https://api.remove.bg/v1.0/removebg', {
+      var rbgController = new AbortController();
+      var rbgTimeout = setTimeout(function(){ rbgController.abort(); }, 10000);
+      var res = await fetch('https://api.remove.bg/v1.0/removebg', { signal: rbgController.signal,
         method:'POST',
         headers:{'X-Api-Key':apiKey,'Content-Type':'application/json'},
-        body: JSON.stringify({image_file_b64: originalB64.split(',')[1], size:'auto', format:'png'})
+        body: JSON.stringify({image_file_b64: fotoParaApi.split(',')[1], size:'regular', format:'png'})
       });
       if (res.ok) {
         var blob = await res.blob();
@@ -2242,19 +2248,21 @@ function loadEnxFoto(input) {
 }
 
 async function enxProcessarFoto(originalB64) {
-  // Redimensiona para max 2000px antes de processar
-  originalB64 = await resizeFotoParaUpload(originalB64, 2000);
+  var fotoParaEditor = await resizeFotoParaUpload(originalB64, 1600);
+  var fotoParaApi    = await resizeFotoParaUpload(originalB64, 800);
   var apiKey = document.getElementById('inp-apikey') ? document.getElementById('inp-apikey').value.trim() : '';
-  var fotoFinal = originalB64;
+  var fotoFinal = fotoParaEditor;
   var hint = document.getElementById('enx-hint');
 
   if (apiKey) {
     try {
-      var b64raw = originalB64.split(',')[1];
-      var res = await fetch('https://api.remove.bg/v1.0/removebg', {
+      var b64raw = fotoParaApi.split(',')[1];
+      var rbgController = new AbortController();
+      var rbgTimeout = setTimeout(function(){ rbgController.abort(); }, 10000);
+      var res = await fetch('https://api.remove.bg/v1.0/removebg', { signal: rbgController.signal,
         method: 'POST',
         headers: {'X-Api-Key': apiKey, 'Content-Type': 'application/json'},
-        body: JSON.stringify({image_file_b64: b64raw, size: 'auto', format: 'png'})
+        body: JSON.stringify({image_file_b64: b64raw, size: 'regular', format: 'png'})
       });
       if (res.ok) {
         var blob = await res.blob();
