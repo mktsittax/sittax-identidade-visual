@@ -499,7 +499,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
             <div class="slider-grid">
               <label>Zoom</label>
-              <input type="range" id="enx-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('enx-vz').textContent=parseFloat(this.value).toFixed(2);drawEnx()">
+              <input type="range" id="enx-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'enxImg','enxX','enxY','enxZoom',ENX_CV,drawEnx,'enx-vz')">
               <span id="enx-vz">1.00</span>
               <label>Brilho</label>
               <input type="range" id="enx-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('enx-vb').textContent=parseFloat(this.value).toFixed(2);drawEnx()">
@@ -612,7 +612,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             </div>
             <div class="slider-grid" style="margin-bottom:18px;">
               <label>Zoom</label>
-              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="avZoom=parseFloat(this.value);document.getElementById('vz').textContent=avZoom.toFixed(2);drawAv()">
+              <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'avImg','avX','avY','avZoom',AV,drawAv,'vz')">
               <span id="vz">1.00</span>
               <label>Brilho</label>
               <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('vb').textContent=parseFloat(this.value).toFixed(2);drawAv()">
@@ -700,7 +700,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
                 <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
                 <div class="slider-grid">
                   <label>Zoom</label>
-                  <input type="range" id="bv-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('bv-vz').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
+                  <input type="range" id="bv-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'bvEditorImg','bvEditorX','bvEditorY','bvEditorZoom',BV_CV,drawBvPreview,'bv-vz');bvUpdate()">
                   <span id="bv-vz">1.00</span>
                   <label>Brilho</label>
                   <input type="range" id="bv-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('bv-vb').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
@@ -761,7 +761,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
             <label style="font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gray);display:block;margin-bottom:10px;">Ajustar encaixe — arraste no círculo →</label>
             <div class="slider-grid">
               <label>Zoom</label>
-              <input type="range" id="sig-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="document.getElementById('sig-vz').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
+              <input type="range" id="sig-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'sigImg','sigX','sigY','sigZoom',SIG_CV,drawSigPreview,'sig-vz');photoB64=sigGetAvatarB64();liveUpdate()">
               <span id="sig-vz">1.00</span>
               <label>Brilho</label>
               <input type="range" id="sig-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('sig-vb').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
@@ -944,6 +944,7 @@ function syncFotoToAllTabs(b64, sourceTab) {
       window[imgVar] = img;
       var z0 = Math.max(cvSize / img.naturalWidth, cvSize / img.naturalHeight);
       z0 = Math.min(Math.max(z0, 0.3), 3.0);
+      window[zoomVarName] = z0;   // ← salva zoom na variável global
       window[xVar] = (cvSize - img.naturalWidth  * z0) / 2;
       window[yVar] = (cvSize - img.naturalHeight * z0) / 2;
       var slZ = document.getElementById(slZoomId);
@@ -967,6 +968,24 @@ function syncFotoToAllTabs(b64, sourceTab) {
 
 // ── Estado global do colaborador ativo ──
 var _globalNome = '', _globalCargo = '', _globalUnidade = '', _globalGender = '';
+
+// ── Altera zoom mantendo o centro visual da foto ──
+function changeZoom(newZ, imgVar, xVar, yVar, zoomVar, cvSize, drawFn, vzId) {
+  var img = window[imgVar];
+  if (!img) { window[zoomVar] = newZ; return; }
+  var oldZ = window[zoomVar] || newZ;
+  // Centro atual da imagem no canvas
+  var cx = window[xVar] + img.naturalWidth  * oldZ / 2;
+  var cy = window[yVar] + img.naturalHeight * oldZ / 2;
+  // Nova posição mantendo o centro
+  window[xVar]     = cx - img.naturalWidth  * newZ / 2;
+  window[yVar]     = cy - img.naturalHeight * newZ / 2;
+  window[zoomVar]  = newZ;
+  if (vzId) { var el = document.getElementById(vzId); if (el) el.textContent = newZ.toFixed(2); }
+  drawFn();
+}
+
+
 
 function syncToAllTabs(source) {
   var nome    = '';
@@ -1031,6 +1050,7 @@ function firstLetterCase(el) {
 // ── SIG EDITOR STATE ──
 var sigImg = null;
 var sigX = 0, sigY = 0;
+var sigZoom = 1.0;
 var sigDragging = false, sigDragSX = 0, sigDragSY = 0, sigStartX = 0, sigStartY = 0;
 var SIG_CV = 200;
 
@@ -1050,7 +1070,7 @@ function drawSigPreview() {
     ctx.fillStyle=g; ctx.fillRect(0,0,SIG_CV,SIG_CV);
   }
   if (sigImg) {
-    var z = parseFloat(document.getElementById('sig-sl-zoom').value);
+    var z = sigZoom;
     var b = parseFloat(document.getElementById('sig-sl-bright').value);
     ctx.filter = 'brightness('+b+')';
     ctx.drawImage(sigImg, sigX, sigY, sigImg.naturalWidth*z, sigImg.naturalHeight*z);
@@ -1069,7 +1089,7 @@ function sigGetAvatarB64() {
   var pad = 8*sc;
   if (_avBgLoaded && _avBgLoaded.complete) ctx.drawImage(_avBgLoaded,-pad,-pad,520+pad*2,520+pad*2);
   if (sigImg) {
-    var z = parseFloat(document.getElementById('sig-sl-zoom').value);
+    var z = sigZoom;
     var b = parseFloat(document.getElementById('sig-sl-bright').value);
     ctx.filter='brightness('+b+')';
     ctx.drawImage(sigImg, sigX*sc, sigY*sc, sigImg.naturalWidth*z*sc, sigImg.naturalHeight*z*sc);
@@ -1140,10 +1160,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!avImg) return;
     e.preventDefault();
     var delta = e.deltaY > 0 ? -0.05 : 0.05;
-    avZoom = Math.min(Math.max(avZoom + delta, 0.5), 2.5);
-    document.getElementById('sl-zoom').value = avZoom;
-    document.getElementById('vz').textContent = avZoom.toFixed(2);
-    drawAv();
+    var newZoom = Math.min(Math.max(avZoom + delta, 0.5), 2.5);
+    document.getElementById('sl-zoom').value = newZoom.toFixed(2);
+    changeZoom(newZoom,'avImg','avX','avY','avZoom',AV,drawAv,'vz');
   }, {passive:false});
 
   // Restore saved Gemini key
@@ -1835,6 +1854,7 @@ Nota: A=tudo ok, B=1 problema leve, C=2 problemas, D=3+ problemas. Seja direto e
 // ── BV EDITOR STATE ──
 var bvEditorImg = null;
 var bvEditorX = 0, bvEditorY = 0;
+var bvEditorZoom = 1.0;
 var bvEditorDragging = false, bvEditorDragSX = 0, bvEditorDragSY = 0;
 var bvEditorStartX = 0, bvEditorStartY = 0;
 var BV_CV = 200;
@@ -1855,7 +1875,7 @@ function drawBvPreview() {
     ctx.fillStyle=g; ctx.fillRect(0,0,BV_CV,BV_CV);
   }
   if (bvEditorImg) {
-    var z = parseFloat(document.getElementById('bv-sl-zoom').value);
+    var z = bvEditorZoom;
     var b = parseFloat(document.getElementById('bv-sl-bright').value);
     ctx.filter = 'brightness('+b+')';
     ctx.drawImage(bvEditorImg, bvEditorX, bvEditorY, bvEditorImg.naturalWidth*z, bvEditorImg.naturalHeight*z);
@@ -1876,7 +1896,7 @@ function bvGetPhotoB64() {
   var pad = 8*sc;
   if (_avBgLoaded && _avBgLoaded.complete) ctx.drawImage(_avBgLoaded,-pad,-pad,OUT+pad*2,OUT+pad*2);
   if (bvEditorImg) {
-    var z = parseFloat(document.getElementById('bv-sl-zoom').value);
+    var z = bvEditorZoom;
     var b = parseFloat(document.getElementById('bv-sl-bright').value);
     ctx.filter='brightness('+b+')';
     ctx.drawImage(bvEditorImg, bvEditorX*sc, bvEditorY*sc, bvEditorImg.naturalWidth*z*sc, bvEditorImg.naturalHeight*z*sc);
@@ -2237,6 +2257,7 @@ async function baixarBV() {
 // ── ENX EDITOR STATE ──
 var enxImg = null;
 var enxX = 0, enxY = 0;
+var enxZoom = 1.0;
 var enxDragging = false;
 var enxDragSX = 0, enxDragSY = 0;
 var enxStartX = 0, enxStartY = 0;
@@ -2261,7 +2282,7 @@ function drawEnx() {
   }
 
   if (enxImg) {
-    var z      = parseFloat(document.getElementById('enx-sl-zoom').value);
+    var z      = enxZoom;
     var bright = parseFloat(document.getElementById('enx-sl-bright').value);
     ctx.filter = 'brightness('+bright+')';
     ctx.drawImage(enxImg, enxX, enxY, enxImg.naturalWidth*z, enxImg.naturalHeight*z);
@@ -2290,7 +2311,7 @@ function enxGetCanvasAsAvatar() {
   }
 
   if (enxImg) {
-    var z      = parseFloat(document.getElementById('enx-sl-zoom').value);
+    var z      = enxZoom;
     var bright = parseFloat(document.getElementById('enx-sl-bright').value);
     ctx.filter = 'brightness('+bright+')';
     ctx.drawImage(enxImg, enxX*scale, enxY*scale, enxImg.naturalWidth*z*scale, enxImg.naturalHeight*z*scale);
