@@ -502,7 +502,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
               <input type="range" id="enx-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'enxImg','enxX','enxY','enxZoom',ENX_CV,drawEnx,'enx-vz')">
               <span id="enx-vz">1.00</span>
               <label>Brilho</label>
-              <input type="range" id="enx-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('enx-vb').textContent=parseFloat(this.value).toFixed(2);drawEnx()">
+              <input type="range" id="enx-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="syncBright(this.value)">
               <span id="enx-vb">1.00</span>
             </div>
           </div>
@@ -615,7 +615,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
               <input type="range" id="sl-zoom" min="0.5" max="2.5" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'avImg','avX','avY','avZoom',AV,drawAv,'vz')">
               <span id="vz">1.00</span>
               <label>Brilho</label>
-              <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('vb').textContent=parseFloat(this.value).toFixed(2);drawAv()">
+              <input type="range" id="sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="syncBright(this.value)">
               <span id="vb">1.00</span>
             </div>
             <div class="av-btns" style="margin-bottom:18px;display:flex;flex-wrap:wrap;gap:10px;">
@@ -703,7 +703,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
                   <input type="range" id="bv-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'bvEditorImg','bvEditorX','bvEditorY','bvEditorZoom',BV_CV,drawBvPreview,'bv-vz');bvUpdate()">
                   <span id="bv-vz">1.00</span>
                   <label>Brilho</label>
-                  <input type="range" id="bv-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('bv-vb').textContent=parseFloat(this.value).toFixed(2);drawBvPreview();bvUpdate()">
+                  <input type="range" id="bv-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="syncBright(this.value)">
                   <span id="bv-vb">1.00</span>
                 </div>
               </div>
@@ -764,7 +764,7 @@ body { font-family:'Plus Jakarta Sans',sans-serif; background:#ECEAE5; min-heigh
               <input type="range" id="sig-sl-zoom" min="0.3" max="3.0" step="0.05" value="1.0" oninput="changeZoom(parseFloat(this.value),'sigImg','sigX','sigY','sigZoom',SIG_CV,drawSigPreview,'sig-vz');photoB64=sigGetAvatarB64();liveUpdate()">
               <span id="sig-vz">1.00</span>
               <label>Brilho</label>
-              <input type="range" id="sig-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="document.getElementById('sig-vb').textContent=parseFloat(this.value).toFixed(2);drawSigPreview();photoB64=sigGetAvatarB64();liveUpdate()">
+              <input type="range" id="sig-sl-bright" min="0.5" max="1.8" step="0.05" value="1.0" oninput="syncBright(this.value)">
               <span id="sig-vb">1.00</span>
             </div>
           </div>
@@ -908,11 +908,17 @@ var SVG_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz
 var currentTab = 'assinatura'; // track active tab
 
 function switchTab(id, btn) {
-  currentTab = id;
+  // Aceita tanto 'avatar' quanto 'tab-avatar'
+  var key = String(id).replace(/^tab-/, '');
+  var panel = document.getElementById('tab-' + key);
+  if (!panel) { console.warn('switchTab: painel #tab-' + key + ' nao existe'); return; }
+  currentTab = key;
   document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.getElementById('tab-'+id).classList.add('active');
-  btn.classList.add('active');
+  panel.classList.add('active');
+  // Se o botao nao veio por argumento, localiza pelo onclick
+  if (!btn) btn = document.querySelector('.tab-btn[onclick*="\'' + key + '\'"]');
+  if (btn) btn.classList.add('active');
 }
 
 // ══════════════════════════════════════
@@ -969,6 +975,31 @@ function syncFotoToAllTabs(b64, sourceTab) {
 // ── Estado global do colaborador ativo ──
 var _globalNome = '', _globalCargo = '', _globalUnidade = '', _globalGender = '';
 
+
+// ── Aplica o mesmo brilho em todas as abas (a foto e a mesma) ──
+var _syncingBright = false;
+function syncBright(val) {
+  if (_syncingBright) return;
+  _syncingBright = true;
+  var v = parseFloat(val).toFixed(2);
+  [['sl-bright','vb'],['sig-sl-bright','sig-vb'],
+   ['enx-sl-bright','enx-vb'],['bv-sl-bright','bv-vb']].forEach(function(p){
+    var sl = document.getElementById(p[0]);
+    var lb = document.getElementById(p[1]);
+    if (sl) sl.value = v;
+    if (lb) lb.textContent = v;
+  });
+  if (typeof drawAv          === 'function') drawAv();
+  if (typeof drawSigPreview  === 'function') drawSigPreview();
+  if (typeof drawEnx         === 'function') drawEnx();
+  if (typeof drawBvPreview   === 'function') drawBvPreview();
+  if (typeof sigGetAvatarB64 === 'function') photoB64   = sigGetAvatarB64();
+  if (typeof bvGetPhotoB64   === 'function') bvPhotoB64 = bvGetPhotoB64();
+  if (typeof liveUpdate      === 'function') liveUpdate();
+  if (typeof bvUpdate        === 'function') bvUpdate();
+  _syncingBright = false;
+}
+
 // ── Altera zoom mantendo o centro visual da foto ──
 function changeZoom(newZ, imgVar, xVar, yVar, zoomVar, cvSize, drawFn, vzId) {
   var img = window[imgVar];
@@ -1012,9 +1043,10 @@ function syncToAllTabs(source) {
     cargo   = (document.getElementById('inp-role') || {value:''}).value;
   }
 
-  if (nome)    _globalNome    = nome;
-  if (cargo)   _globalCargo   = cargo;
-  if (unidade) _globalUnidade = unidade;
+  // Grava sempre — inclusive string vazia, para permitir apagar o campo
+  _globalNome    = nome;
+  _globalCargo   = cargo;
+  if (unidade) _globalUnidade = unidade;   // selects nunca ficam vazios
   if (gender)  _globalGender  = gender;
 
   // Propaga para todas as outras abas
@@ -1034,7 +1066,12 @@ function syncToAllTabs(source) {
   };
   Object.keys(fields).forEach(function(id) {
     var el = document.getElementById(id);
-    if (el && fields[id] && el.value !== fields[id]) el.value = fields[id];
+    if (!el) return;
+    var val = fields[id];
+    if (val === undefined || val === null) return;
+    // Nunca sobrescreve o campo que o usuário está editando
+    if (el === document.activeElement) return;
+    if (el.value !== val) el.value = val;
   });
 }
 
@@ -1437,9 +1474,11 @@ function baixarPNG() {
 }
 
 function copiarHTML() {
-  var t=document.getElementById('html-out').textContent;
-  navigator.clipboard.writeText(t).then(function(){
-    var b=document.getElementById('btn-copy');
+  var out = document.getElementById('html-out');
+  if (!out) return;
+  navigator.clipboard.writeText(out.textContent).then(function(){
+    var b = document.getElementById('btn-copy');
+    if (!b) return;   // botao foi removido da UI — copia mesmo assim
     b.classList.add('ok'); b.textContent='✓ Copiado!';
     setTimeout(function(){b.classList.remove('ok');b.textContent='📋 Copiar HTML';},2500);
   });
@@ -1673,7 +1712,7 @@ function usarNaSig() {
     liveUpdate();
   };
   img.src = avDataUrl;
-  switchTab('tab-assinatura');
+  switchTab('assinatura');
 }
 
 function usarNoBV() {
@@ -1688,7 +1727,7 @@ function usarNoBV() {
   var ctrl = document.getElementById('bv-controls');
   if (ctrl) { ctrl.style.opacity='1'; ctrl.style.pointerEvents='auto'; }
   bvUpdate();
-  switchTab('tab-boasvindas');
+  switchTab('boasvindas');
 }
 
 async function applyImgToAvatar(imgSrc) {
@@ -2041,7 +2080,10 @@ async function bvDrawClassico(cvs, S) {
   var nome = document.getElementById('bv-name').value.trim() || 'Nome Completo';
   var role = document.getElementById('bv-role').value.trim() || 'Cargo';
   var unit = document.getElementById('bv-unit').value.trim() || 'Sittax Matriz';
-  var gen  = bvDetectGender(nome);
+  // Respeita o seletor manual de gênero; 'auto' cai na detecção pelo nome
+  var genSel = document.getElementById('bv-gender');
+  var genVal = genSel ? genSel.value : 'auto';
+  var gen  = (genVal === 'm' || genVal === 'f') ? genVal : bvDetectGender(nome);
   var bvL1 = 'Bem-', bvL2 = gen==='f'?'vinda':'vindo';
   cvs.width = S; cvs.height = S;
   var ctx = cvs.getContext('2d'), u = S/1080;
@@ -2153,9 +2195,10 @@ async function bvDrawClassico(cvs, S) {
   ctx.lineTo(pinCX + headR*0.85, pinTY + headR*0.9);
   ctx.lineTo(pinCX, pinTY + pinSz*0.92);
   ctx.closePath(); ctx.fill();
-  // buraco central (subtrai com cor de fundo)
-  ctx.fillStyle = '#F05A1A';
+  // buraco central — recorta de verdade para o fundo BV_BG aparecer
+  ctx.globalCompositeOperation = 'destination-out';
   ctx.beginPath(); ctx.arc(pinCX, pinTY + headR, headR*0.42, 0, Math.PI*2); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
   var pinW = pinSz + Math.round(10*u);
   var uw   = unit.toUpperCase().split(' ');
@@ -2249,7 +2292,7 @@ async function baixarBV() {
     var a=document.createElement('a');
     a.href=url; a.download='boasvindas_'+n.replace(/\s+/g,'_')+'.png';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  });
+  })();
 }
 
 
@@ -3761,33 +3804,4 @@ function pesqIrEnxoval() {
 
 
 </body>
-</html
-  <!-- ══ ABA: PESQUISA ══ -->
-  <div class="tab-panel" id="tab-pesquisa">
-    <div class="card-head"><span class="pill">RH</span><h2>Pesquisa de Colaboradores</h2></div>
-    <div class="card-body">
-
-      <!-- Campo de busca -->
-      <div style="max-width:520px;margin:0 auto 28px;">
-        <div style="display:flex;gap:10px;align-items:center;">
-          <input id="pesq-input" type="text" placeholder="Digite o nome do colaborador..." style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:var(--dark);background:var(--light);outline:none;" onkeydown="if(event.key==='Enter') pesquisar()" oninput="if(this.value==='') pesqClear()">
-          <button class="btn-orange" onclick="pesquisar()" style="padding:12px 24px;white-space:nowrap;">🔍 Buscar</button>
-        </div>
-        <div id="pesq-status" style="font-size:11px;color:#aaa;margin-top:6px;text-align:center;min-height:16px;"></div>
-      </div>
-
-      <!-- Resultados -->
-      <div id="pesq-results" style="display:none;">
-        <!-- Preenchido via JS -->
-      </div>
-
-      <!-- Estado vazio -->
-      <div id="pesq-empty" style="text-align:center;padding:48px 24px;color:#bbb;">
-        <div style="font-size:40px;margin-bottom:12px;">🔍</div>
-        <div style="font-size:15px;font-weight:600;color:var(--dark);margin-bottom:6px;">Pesquise um colaborador</div>
-        <div style="font-size:13px;">Digite o nome completo ou apenas o primeiro nome para buscar na planilha do Drive.</div>
-      </div>
-
-    </div>
-  </div
->
+</html>
